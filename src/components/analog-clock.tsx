@@ -87,7 +87,8 @@ export function AnalogClock({
               y={y}
               textAnchor="middle"
               dominantBaseline="central"
-              className="fill-muted-foreground text-[10px] font-medium"
+              className="fill-foreground text-[13px] font-semibold"
+              style={{ fontFamily: "var(--font-sans)" }}
             >
               {num}
             </text>

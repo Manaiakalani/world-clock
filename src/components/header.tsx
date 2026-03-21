@@ -18,8 +18,8 @@ export function Header({ now }: HeaderProps) {
           <Globe className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-lg font-bold tracking-tight">World Clock</h1>
-          <p className="text-xs text-muted-foreground">{formatDate(now)}</p>
+          <h1 className="text-lg font-bold tracking-tight leading-tight">World Clock</h1>
+          <p className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase">{formatDate(now)}</p>
         </div>
       </div>
 
