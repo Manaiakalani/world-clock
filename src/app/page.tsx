@@ -43,28 +43,28 @@ export default function WorldClockPage() {
       <div className="relative z-10 flex min-h-screen flex-col">
         <Header now={now} />
 
-        <main className="flex flex-1 flex-col lg:flex-row gap-6 px-6 pb-6">
-          {/* Globe — left side */}
-          <div className="flex flex-1 items-center justify-center lg:max-w-[55%]">
+        <main className="flex flex-1 flex-col xl:flex-row gap-4 px-4 pb-6 sm:px-6 lg:gap-8 lg:px-8">
+          {/* Globe — left side (hidden on mobile, visible from lg up) */}
+          <div className="hidden lg:flex flex-1 items-center justify-center">
             <GlobeViewer
               focusRegionId={activeRegionId}
-              className="w-full max-w-[600px]"
+              className="w-full max-w-[560px]"
             />
           </div>
 
-          {/* Clock + Region list — right side */}
-          <div className="flex flex-1 flex-col gap-4 lg:max-w-[45%]">
+          {/* Clock + Region list — right side (full width on mobile) */}
+          <div className="flex w-full flex-col gap-4 xl:max-w-[520px]">
             {/* Team header */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold">Team</h2>
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-lg font-semibold tracking-tight">Team</h2>
+                <span className="flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
                   {onlineCount} online
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
                 <Switch
                   checked={showClock}
@@ -77,14 +77,14 @@ export default function WorldClockPage() {
 
             {/* Analog clock */}
             {showClock && (
-              <div className="mx-auto w-full max-w-[320px]">
+              <div className="mx-auto w-full max-w-[280px] sm:max-w-[320px]">
                 <AnalogClock
                   regions={regions}
                   now={now}
                   localTimezone={localTimezone}
                   className="aspect-square"
                 />
-                <p className="mt-1 text-center font-mono text-lg font-bold tabular-nums tracking-wider">
+                <p className="mt-2 text-center font-mono text-xl font-bold tabular-nums tracking-widest">
                   {formatTimeFull(localTimezone, now)}
                 </p>
               </div>
