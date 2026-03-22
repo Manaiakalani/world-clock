@@ -1,40 +1,43 @@
 "use client";
 
-import { Moon, Sun, Globe } from "lucide-react";
-import { useTheme } from "next-themes";
 import { formatDate } from "@/lib/timezone-utils";
-
 interface HeaderProps {
   now: Date;
 }
 
 export function Header({ now }: HeaderProps) {
-  const { theme, setTheme } = useTheme();
-
   return (
-    <header className="flex items-center justify-between px-6 py-4">
+    <header className="flex shrink-0 items-center justify-between px-4 py-2 sm:px-6 sm:py-3">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-          <Globe className="h-5 w-5 text-primary" />
+        <div className="group flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 border border-white/10 backdrop-blur-sm shadow-sm cursor-default transition-transform duration-300 hover:scale-110">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5 text-primary"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {/* Globe circle */}
+            <circle cx="12" cy="12" r="9.5" className="globe-anim animate-[globe-pulse_4s_ease-in-out_infinite]" />
+            {/* Meridian lines */}
+            <ellipse cx="12" cy="12" rx="4" ry="9.5" className="globe-anim animate-[globe-spin_8s_linear_infinite]" />
+            <ellipse cx="12" cy="12" rx="7" ry="9.5" className="globe-anim animate-[globe-spin_8s_linear_infinite_reverse]" style={{ animationDelay: "-2s" }} />
+            {/* Latitude lines */}
+            <path d="M3 12h18" />
+            <path d="M4.5 7.5h15" opacity="0.5" />
+            <path d="M4.5 16.5h15" opacity="0.5" />
+            {/* Orbiting dot */}
+            <circle r="1.2" fill="currentColor" stroke="none" className="globe-anim animate-[globe-orbit_3s_cubic-bezier(0.37,0,0.63,1)_infinite]" />
+          </svg>
         </div>
         <div>
-          <h1 className="text-lg font-bold tracking-tight leading-tight">World Clock</h1>
-          <p className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase">{formatDate(now)}</p>
+          <h1 className="text-base font-bold tracking-tight leading-tight">World Clock</h1>
+          <p className="text-[10px] font-medium text-muted-foreground tracking-wide uppercase">{formatDate(now)}</p>
         </div>
       </div>
 
-      <button
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border border-border
-                   bg-background/50 backdrop-blur-sm transition-colors hover:bg-accent"
-        aria-label="Toggle theme"
-      >
-        {theme === "dark" ? (
-          <Sun className="h-4 w-4" />
-        ) : (
-          <Moon className="h-4 w-4" />
-        )}
-      </button>
     </header>
   );
 }

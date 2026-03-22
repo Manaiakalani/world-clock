@@ -6,6 +6,7 @@ export interface SkyGradient {
 }
 
 // Gradient colors inspired by the sky reference image (clear sky column)
+// Colors are vivid and saturated to show through the glass overlay
 const SKY_PERIODS: Array<{
   startHour: number;
   gradient: SkyGradient;
@@ -13,54 +14,54 @@ const SKY_PERIODS: Array<{
   {
     startHour: 0,
     gradient: {
-      from: "#0a0a1a",
-      via: "#0d0d21",
-      to: "#0f0f26",
+      from: "#050510",
+      via: "#0a0a1e",
+      to: "#0e0e2a",
       label: "deep night",
     },
   },
   {
     startHour: 4,
     gradient: {
-      from: "#2d3561",
-      via: "#8b7a6b",
-      to: "#c4956a",
+      from: "#1a2151",
+      via: "#a07558",
+      to: "#e8a862",
       label: "dawn",
     },
   },
   {
     startHour: 6,
     gradient: {
-      from: "#7ab0cc",
-      via: "#a8cce0",
-      to: "#d4e4f0",
+      from: "#5ca0d0",
+      via: "#8ec4e8",
+      to: "#c8e0f4",
       label: "morning",
     },
   },
   {
     startHour: 9,
     gradient: {
-      from: "#3a7fbf",
-      via: "#5a9ad4",
-      to: "#7db5e6",
+      from: "#2070b8",
+      via: "#3c90d8",
+      to: "#60ade8",
       label: "midday",
     },
   },
   {
     startHour: 14,
     gradient: {
-      from: "#5b9bd5",
-      via: "#8eb8e0",
-      to: "#bfd5eb",
+      from: "#4088cc",
+      via: "#70a8dc",
+      to: "#a0c8ec",
       label: "afternoon",
     },
   },
   {
     startHour: 17,
     gradient: {
-      from: "#4a5580",
-      via: "#8e7a9e",
-      to: "#c4a882",
+      from: "#3a4070",
+      via: "#9070a0",
+      to: "#d4a070",
       label: "dusk",
     },
   },
@@ -118,7 +119,13 @@ function lerpGradient(
   };
 }
 
+const gradientCache = new Map<number, SkyGradient>();
+
 export function getGradientForHour(hour: number): SkyGradient {
+  const quantized = Math.round(hour * 4) / 4;
+  const cached = gradientCache.get(quantized);
+  if (cached) return cached;
+
   const h = ((hour % 24) + 24) % 24;
 
   let currentIdx = 0;
@@ -140,13 +147,17 @@ export function getGradientForHour(hour: number): SkyGradient {
   const elapsed = h - current.startHour;
   const t = Math.max(0, Math.min(1, elapsed / span));
 
-  return lerpGradient(current.gradient, next.gradient, t);
+  const result = lerpGradient(current.gradient, next.gradient, t);
+
+  // Keep cache bounded (96 entries = 24 hours * 4 per hour)
+  if (gradientCache.size > 96) gradientCache.clear();
+  gradientCache.set(quantized, result);
+
+  return result;
 }
 
 export function gradientToCSS(gradient: SkyGradient): string {
   return `linear-gradient(to bottom, ${gradient.from}, ${gradient.via}, ${gradient.to})`;
 }
 
-export function isDarkTime(hour: number): boolean {
-  return hour < 6 || hour >= 19;
-}
+
