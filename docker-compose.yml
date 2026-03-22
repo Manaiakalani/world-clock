@@ -4,7 +4,7 @@ services:
     container_name: world-clock
     restart: unless-stopped
     ports:
-      - "${PORT:-3100}:3000"
+      - "${PORT:-3009}:3000"
     environment:
       - NODE_ENV=production
     healthcheck:
