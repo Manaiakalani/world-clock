@@ -13,8 +13,8 @@ for (const vp of viewports) {
     page,
   }) => {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
+    await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(5000);
     await page.screenshot({
       path: `screenshots/${vp.name}.png`,
       fullPage: true,

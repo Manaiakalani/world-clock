@@ -1,3 +1,15 @@
+import { ALL_TIMEZONES, type TimezoneEntry } from "@/data/timezone-data";
+import { getFlagForTimezone } from "@/lib/timezone-flags";
+import { getRegionHour, getRegionMinute } from "@/lib/timezone-utils";
+import { getGradientForHour } from "@/lib/sky-gradients";
+
+// Get UTC offset in minutes for a timezone (negative = west, positive = east)
+function getUtcOffset(timezone: string, now: Date): number {
+  const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
+  const tzStr = now.toLocaleString("en-US", { timeZone: timezone });
+  return new Date(tzStr).getTime() - new Date(utcStr).getTime();
+}
+
 export interface Region {
   id: string;
   name: string;
@@ -5,88 +17,58 @@ export interface Region {
   timezone: string;
   coordinates: [number, number]; // [lat, lon]
   color: [number, number, number]; // RGB 0-1 for COBE marker
-  emoji: string;
+  flag: string; // Country flag emoji
 }
 
-export const regions: Region[] = [
-  {
-    id: "americas-west",
-    name: "Americas · West",
-    city: "San Francisco",
-    timezone: "America/Los_Angeles",
-    coordinates: [37.78, -122.44],
-    color: [0.35, 0.6, 1],
-    emoji: "🇺🇸",
-  },
-  {
-    id: "americas-east",
-    name: "Americas · East",
-    city: "New York",
-    timezone: "America/New_York",
-    coordinates: [40.71, -74.01],
-    color: [0.4, 0.55, 0.95],
-    emoji: "🇺🇸",
-  },
-  {
-    id: "south-america",
-    name: "South America",
-    city: "São Paulo",
-    timezone: "America/Sao_Paulo",
-    coordinates: [-23.55, -46.63],
-    color: [0.3, 0.75, 0.5],
-    emoji: "🇧🇷",
-  },
-  {
-    id: "europe-west",
-    name: "Europe · West",
-    city: "London",
-    timezone: "Europe/London",
-    coordinates: [51.51, -0.13],
-    color: [0.9, 0.5, 0.3],
-    emoji: "🇬🇧",
-  },
-  {
-    id: "europe-central",
-    name: "Europe · Central",
-    city: "Paris",
-    timezone: "Europe/Paris",
-    coordinates: [48.86, 2.35],
-    color: [0.85, 0.45, 0.55],
-    emoji: "🇫🇷",
-  },
-  {
-    id: "middle-east",
-    name: "Middle East",
-    city: "Dubai",
-    timezone: "Asia/Dubai",
-    coordinates: [25.2, 55.27],
-    color: [1, 0.7, 0.3],
-    emoji: "🇦🇪",
-  },
-  {
-    id: "asia-east",
-    name: "Asia · East",
-    city: "Tokyo",
-    timezone: "Asia/Tokyo",
-    coordinates: [35.68, 139.65],
-    color: [1, 0.4, 0.5],
-    emoji: "🇯🇵",
-  },
-  {
-    id: "oceania",
-    name: "Oceania",
-    city: "Sydney",
-    timezone: "Australia/Sydney",
-    coordinates: [-33.87, 151.21],
-    color: [0.5, 0.85, 0.6],
-    emoji: "🇦🇺",
-  },
-];
+// Parse hex color string to [r,g,b] tuple (0-1 range)
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.substring(0, 2), 16) / 255,
+    parseInt(h.substring(2, 4), 16) / 255,
+    parseInt(h.substring(4, 6), 16) / 255,
+  ];
+}
 
-// Generate arc pairs — connect every region to its 2 nearest neighbors by longitude
+// Get the sky gradient color for a timezone's current hour
+function skyColorForTimezone(timezone: string, now: Date): [number, number, number] {
+  const hour = getRegionHour(timezone, now);
+  const minute = getRegionMinute(timezone, now);
+  const gradient = getGradientForHour(hour + minute / 60);
+  // Use the midpoint 'via' color for a representative sky tone
+  return hexToRgb(gradient.via);
+}
+
+export function regionsFromTimezones(timezoneIds: string[], now?: Date): Region[] {
+  const currentTime = now ?? new Date();
+  return timezoneIds
+    .map((tzId) => {
+      const entry = ALL_TIMEZONES.find((t) => t.timezone === tzId);
+      if (!entry) return null;
+      return {
+        id: tzId.replace(/\//g, "-").toLowerCase(),
+        name: entry.continent,
+        city: entry.label,
+        timezone: entry.timezone,
+        coordinates: entry.coordinates as [number, number],
+        color: skyColorForTimezone(tzId, currentTime),
+        flag: getFlagForTimezone(tzId),
+      };
+    })
+    .filter((r): r is Region => r !== null)
+    .sort((a, b) => {
+      // Sort by UTC offset (west → east)
+      const aOff = getUtcOffset(a.timezone, currentTime);
+      const bOff = getUtcOffset(b.timezone, currentTime);
+      return aOff - bOff;
+    });
+}
+
+// Generate arc pairs — connect every region to its nearest neighbor by longitude (chain)
 export function generateArcs(
   regionList: Region[]
 ): Array<{ from: [number, number]; to: [number, number] }> {
+  if (regionList.length < 2) return [];
   const arcs: Array<{ from: [number, number]; to: [number, number] }> = [];
   const sorted = [...regionList].sort(
     (a, b) => a.coordinates[1] - b.coordinates[1]
