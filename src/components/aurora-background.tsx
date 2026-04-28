@@ -370,7 +370,17 @@ export function AuroraBackground({
     uniformsRef.current = uniforms;
     startTimeRef.current = Date.now();
 
-    function render() {
+    let lastFrame = 0;
+    function render(t: number = performance.now()) {
+      // Throttle to ~30fps — atmospheric scattering shifts slowly enough
+      // that 60fps is wasted GPU/CPU on this background. Saves ~50% power.
+      const minFrameMs = 1000 / 30;
+      if (t - lastFrame < minFrameMs) {
+        rafRef.current = requestAnimationFrame(render);
+        return;
+      }
+      lastFrame = t;
+
       const { hour: h, minuteFraction: mf, dark: d } = paramsRef.current;
       const params = getSceneParams(h, mf, d);
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
@@ -400,7 +410,7 @@ export function AuroraBackground({
       rafRef.current = requestAnimationFrame(render);
     }
 
-    rafRef.current = requestAnimationFrame(render);
+    rafRef.current = requestAnimationFrame(() => render());
 
     const handleVisibility = () => {
       if (document.hidden) {
@@ -409,7 +419,7 @@ export function AuroraBackground({
       } else {
         if (!rafRef.current) {
           startTimeRef.current = Date.now() - (Date.now() - startTimeRef.current);
-          rafRef.current = requestAnimationFrame(render);
+          rafRef.current = requestAnimationFrame(() => render());
         }
       }
     };

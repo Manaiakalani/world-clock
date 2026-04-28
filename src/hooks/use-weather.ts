@@ -46,6 +46,13 @@ export function useWeather(locations: LocationInput[]) {
   const fetchingRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Stable identity for the location set — only changes when ids/coords actually change.
+  // Without this, the regions useMemo upstream re-creates the array every minute even
+  // when the inputs haven't changed, causing fetchAll to re-run unnecessarily.
+  const locationsKey = locations
+    .map((l) => `${l.id}:${l.coordinates[0]},${l.coordinates[1]}`)
+    .join("|");
+
   // Load saved unit preference
   useEffect(() => {
     try {
@@ -80,16 +87,36 @@ export function useWeather(locations: LocationInput[]) {
     saveCache(results);
     setLoading(false);
     fetchingRef.current = false;
-  }, [locations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationsKey]);
 
-  // Initial load — try cache first, then fetch
+  // Initial load — try cache first, then defer the network fetch until the
+  // browser is idle so it doesn't compete with first-paint work.
   useEffect(() => {
     const cached = loadCache();
     if (cached) {
       setWeather(cached.data);
       setLoading(false);
     }
-    fetchAll();
+
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const w = window as IdleWindow;
+    let handle: number | ReturnType<typeof setTimeout>;
+    if (typeof w.requestIdleCallback === "function") {
+      handle = w.requestIdleCallback(() => fetchAll(), { timeout: 2000 });
+    } else {
+      handle = setTimeout(fetchAll, 250);
+    }
+    return () => {
+      if (typeof handle === "number" && typeof w.cancelIdleCallback === "function") {
+        w.cancelIdleCallback(handle);
+      } else {
+        clearTimeout(handle as ReturnType<typeof setTimeout>);
+      }
+    };
   }, [fetchAll]);
 
   // Periodic refresh

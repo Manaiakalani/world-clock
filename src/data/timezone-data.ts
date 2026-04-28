@@ -433,7 +433,6 @@ export const DEFAULT_TIMEZONES = [
   "America/New_York",
   "Africa/Nairobi",
   "Europe/London",
-  "Europe/Paris",
   "Asia/Calcutta",
   "Asia/Tokyo",
   "Australia/Sydney",
