@@ -182,6 +182,13 @@ a:focus-visible {
     transform: scale(1.01);
   }
 }
+
+/* Skip rendering offscreen region cards. ~70px intrinsic-size matches the
+   typical card height so layout doesn't jump as cards scroll into view. */
+.region-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 64px;
+}
 /* Hide Next.js dev indicator */
 [data-nextjs-dialog-overlay],
 [data-nextjs-toast],
