@@ -52,6 +52,11 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        {/* Warm up TLS to Open-Meteo so the first weather request after first paint is fast. */}
+        <link rel="preconnect" href="https://api.open-meteo.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://api.open-meteo.com" />
+      </head>
       <body className="h-full overflow-hidden font-sans">
         <a
           href="#main-content"
