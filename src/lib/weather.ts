@@ -44,6 +44,8 @@ export interface WeatherData {
   isDay: boolean;
   emoji: string;
   label: string;
+  sunrise?: string;
+  sunset?: string;
 }
 
 export function getWeatherEmoji(code: number, isDay: boolean): string {
@@ -70,6 +72,10 @@ interface OpenMeteoResponse {
     weather_code?: number;
     is_day?: number;
   };
+  daily?: {
+    sunrise?: string[];
+    sunset?: string[];
+  };
 }
 
 export async function fetchWeather(
@@ -78,7 +84,7 @@ export async function fetchWeather(
   signal?: AbortSignal
 ): Promise<WeatherData | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&daily=sunrise,sunset&timezone=auto`;
     const res = await fetch(url, { signal });
     if (!res.ok) return null;
     const data: OpenMeteoResponse = await res.json();
@@ -95,6 +101,8 @@ export async function fetchWeather(
       isDay,
       emoji: getWeatherEmoji(code, isDay),
       label: getWeatherLabel(code),
+      sunrise: data.daily?.sunrise?.[0],
+      sunset: data.daily?.sunset?.[0],
     };
   } catch {
     return null;

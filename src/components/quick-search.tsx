@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ALL_TIMEZONES } from "@/data/timezone-data";
+import { ALL_TIMEZONES, type TimezoneEntry } from "@/data/timezone-data";
+import { resolveTimezoneQuery } from "@/data/timezone-aliases";
 import { formatTime } from "@/lib/timezone-utils";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
 import { Search, X } from "lucide-react";
@@ -21,19 +22,47 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const results = useMemo(() => {
+  // Index ALL_TIMEZONES by IANA id for O(1) lookups when resolving aliases
+  const tzIndex = useMemo(
+    () => new Map(ALL_TIMEZONES.map((tz) => [tz.timezone, tz])),
+    []
+  );
+
+  interface SearchResult extends TimezoneEntry {
+    aliasHint?: string; // e.g. "via EST"
+  }
+
+  const results: SearchResult[] = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) {
-      // Show currently active timezones when no query
       return ALL_TIMEZONES.filter((tz) => isActive(tz.timezone)).slice(0, 10);
     }
-    return ALL_TIMEZONES.filter(
+
+    // Direct name/timezone/continent matching
+    const directResults: SearchResult[] = ALL_TIMEZONES.filter(
       (tz) =>
         tz.label.toLowerCase().includes(q) ||
         tz.timezone.toLowerCase().includes(q) ||
         tz.continent.toLowerCase().includes(q)
     ).slice(0, 10);
-  }, [search, isActive]);
+
+    // If direct matches are sparse, try alias resolution
+    if (directResults.length < 3) {
+      const aliasMatches = resolveTimezoneQuery(q);
+      const seen = new Set(directResults.map((r) => r.timezone));
+
+      for (const match of aliasMatches) {
+        if (seen.has(match.timezone)) continue;
+        const entry = tzIndex.get(match.timezone);
+        if (!entry) continue;
+        seen.add(match.timezone);
+        directResults.push({ ...entry, aliasHint: `via ${match.matchedVia}` });
+        if (directResults.length >= 10) break;
+      }
+    }
+
+    return directResults;
+  }, [search, isActive, tzIndex]);
 
   // Focus input on mount
   useEffect(() => {
@@ -125,7 +154,12 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
                   <span className="text-base leading-none shrink-0">{getFlagForTimezone(tz.timezone)}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{tz.label}</div>
-                    <div className="text-[10px] text-muted-foreground truncate">{tz.continent} · {tz.timezone}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">
+                      {tz.continent} · {tz.timezone}
+                      {tz.aliasHint && (
+                        <span className="ml-1 text-muted-foreground/60 italic">{tz.aliasHint}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-xs font-mono tabular-nums" suppressHydrationWarning>

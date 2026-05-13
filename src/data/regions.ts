@@ -44,9 +44,9 @@ function skyColorForTimezone(timezone: string, now: Date): [number, number, numb
   return hexToRgb(gradient.via);
 }
 
-export function regionsFromTimezones(timezoneIds: string[], now?: Date): Region[] {
+export function regionsFromTimezones(timezoneIds: string[], now?: Date, customOrder?: boolean): Region[] {
   const currentTime = now ?? new Date();
-  return timezoneIds
+  const regions = timezoneIds
     .map((tzId) => {
       const entry = TIMEZONE_INDEX.get(tzId);
       if (!entry) return null;
@@ -60,13 +60,19 @@ export function regionsFromTimezones(timezoneIds: string[], now?: Date): Region[
         flag: getFlagForTimezone(tzId),
       };
     })
-    .filter((r): r is Region => r !== null)
-    .sort((a, b) => {
-      // Sort by UTC offset (west → east)
+    .filter((r): r is Region => r !== null);
+
+  // When customOrder is true, preserve the input array order (user-defined).
+  // Otherwise sort by UTC offset (west → east).
+  if (!customOrder) {
+    regions.sort((a, b) => {
       const aOff = getUtcOffset(a.timezone, currentTime);
       const bOff = getUtcOffset(b.timezone, currentTime);
       return aOff - bOff;
     });
+  }
+
+  return regions;
 }
 
 // Generate arc pairs — connect every region to its nearest neighbor by longitude (chain)
