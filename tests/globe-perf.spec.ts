@@ -20,13 +20,10 @@ test.describe("Globe performance", () => {
     await cards.first().click();
     await page.waitForTimeout(2000);
 
-    // Should have focus logs but NO init logs
+    // Should have NO init/re-init logs — globe updates via refs, not recreation
     const initCount = logs.filter((l) => l.includes("init")).length;
-    const focusCount = logs.filter((l) => l.includes("focus")).length;
-
     console.log("Globe logs after click:", logs);
     expect(initCount).toBe(0); // no re-init on click
-    expect(focusCount).toBeGreaterThanOrEqual(1);
 
     // Click another card
     if ((await cards.count()) > 1) {

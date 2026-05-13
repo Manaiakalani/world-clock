@@ -18,7 +18,7 @@ import { getRegionHour, getRegionMinute, formatTimeFull, getTimezoneAbbr } from 
 import { useCustomOrder } from "@/hooks/use-custom-order";
 import { useDevMode } from "@/hooks/use-dev-mode";
 import { Switch } from "@/components/ui/switch";
-import { Clock, List, Settings2, Moon, Sun, Link2, Check, Calendar, Info, MoreHorizontal, Search } from "lucide-react";
+import { Clock, List, Settings2, Moon, Sun, Link2, Check, Calendar, Info, MoreHorizontal, Search, ArrowUpDown } from "lucide-react";
 
 // Modal/conditional surfaces — lazy-loaded so they don't ship in the initial bundle.
 const TimezoneManager = dynamic(
@@ -351,6 +351,18 @@ export default function WorldClockPage() {
                       aria-label="About World Clock"
                     >
                       <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </button>
+                    <button
+                      onClick={toggleCustomOrder}
+                      className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border
+                                 transition-[transform,background-color] duration-160
+                                 hover:bg-accent active:scale-[0.95]
+                                 ${customOrder ? "bg-accent/80" : "bg-background/50"}`}
+                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
+                      aria-label={customOrder ? "Sort by time" : "Custom order (drag to reorder)"}
+                      title={customOrder ? "Sort by time" : "Custom order"}
+                    >
+                      <ArrowUpDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
                     </div>
                   </div>

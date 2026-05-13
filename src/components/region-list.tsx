@@ -31,36 +31,48 @@ export function RegionList({
   onReorder,
   devMode,
 }: RegionListProps) {
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
+  // Use refs for drag indices — state updates are async and won't flush before dragEnd fires
+  const dragIndexRef = useRef<number | null>(null);
+  const overIndexRef = useRef<number | null>(null);
   const dragNodeRef = useRef<HTMLDivElement | null>(null);
+  // State only for visual drop indicator
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
-    setDragIndex(index);
+    dragIndexRef.current = index;
     dragNodeRef.current = e.currentTarget as HTMLDivElement;
     e.dataTransfer.effectAllowed = "move";
-    // Make the drag image slightly transparent
-    if (dragNodeRef.current) {
-      dragNodeRef.current.style.opacity = "0.5";
-    }
+    e.dataTransfer.setData("text/plain", String(index));
+    requestAnimationFrame(() => {
+      if (dragNodeRef.current) dragNodeRef.current.style.opacity = "0.5";
+      setIsDragging(true);
+    });
   }, []);
 
   const handleDragEnd = useCallback(() => {
-    if (dragNodeRef.current) {
-      dragNodeRef.current.style.opacity = "1";
+    if (dragNodeRef.current) dragNodeRef.current.style.opacity = "1";
+    const from = dragIndexRef.current;
+    const to = overIndexRef.current;
+    if (from !== null && to !== null && from !== to) {
+      onReorder?.(from, to);
     }
-    if (dragIndex !== null && overIndex !== null && dragIndex !== overIndex && onReorder) {
-      onReorder(dragIndex, overIndex);
-    }
-    setDragIndex(null);
-    setOverIndex(null);
+    dragIndexRef.current = null;
+    overIndexRef.current = null;
     dragNodeRef.current = null;
-  }, [dragIndex, overIndex, onReorder]);
+    setDropTarget(null);
+    setIsDragging(false);
+  }, [onReorder]);
 
   const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    setOverIndex(index);
+    overIndexRef.current = index;
+    setDropTarget(index);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
   }, []);
 
   return (
@@ -69,7 +81,7 @@ export function RegionList({
         <div
           key={region.id}
           className={`region-card-enter ${
-            overIndex === index && dragIndex !== null && dragIndex !== index
+            dropTarget === index && isDragging && dragIndexRef.current !== index
               ? "border-t-2 border-primary/50"
               : ""
           }`}
@@ -78,6 +90,7 @@ export function RegionList({
           onDragStart={(e) => handleDragStart(e, index)}
           onDragEnd={handleDragEnd}
           onDragOver={(e) => handleDragOver(e, index)}
+          onDrop={handleDrop}
         >
           <div className={`flex items-center gap-0 ${customOrder ? "group/drag" : ""}`}>
             {customOrder && (
