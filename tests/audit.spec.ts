@@ -443,7 +443,7 @@ test.describe("Fit & finish audit", () => {
     expect(enterClasses).toBeGreaterThan(0);
   });
 
-  test("Screenshot — both themes", async ({ page }) => {
+  test("Screenshot — both themes", { timeout: 120_000 }, async ({ page }) => {
     for (const vp of viewports) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });

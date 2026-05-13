@@ -7,7 +7,7 @@ interface HeaderProps {
 
 export function Header({ now }: HeaderProps) {
   return (
-    <header className="flex shrink-0 items-center justify-between px-4 py-2 sm:px-6 sm:py-3">
+    <header className="flex shrink-0 items-center justify-between px-4 py-2 sm:px-6 sm:py-3 border-b border-white/5">
       <div className="flex items-center gap-3">
         <div className="group flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 border border-white/10 backdrop-blur-sm shadow-sm cursor-default transition-transform duration-300 hover:scale-110">
           <svg

@@ -118,7 +118,7 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
                 {weather.emoji} {Math.round(weather.temperatureC)}°/{weather.temperatureF}°
               </span>
             ) : (
-              <span className="inline-block w-12 h-3 rounded bg-white/20 animate-pulse" />
+              <span className="inline-block w-12 h-3 rounded bg-white/10 weather-shimmer" />
             )}
             {dstTransition && (
               <span className={`text-[10px] leading-tight ${dstTransition.daysUntil >= 0 ? "text-amber-300/90" : "text-white/50"}`}>
@@ -142,36 +142,43 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
         </div>
       </div>
 
-      {/* Expanded details */}
-      {isActive && (
-        <div className="relative z-10 mt-2 pt-2 border-t border-white/15"
-             style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
-          <div className="flex items-center justify-between text-[11px] sm:text-xs text-white/80">
-            <span suppressHydrationWarning>{expandedDate}</span>
-            {weather && (
-              <span className="font-medium">{weather.label}</span>
-            )}
-          </div>
-          {sunriseStr && sunsetStr && (
-            <div className="mt-1.5 flex items-center gap-3 text-[11px] sm:text-xs text-white/80" suppressHydrationWarning>
-              <span>🌅 {sunriseStr}</span>
-              <span>🌇 {sunsetStr}</span>
-            </div>
-          )}
-          <div className="mt-1 text-[10px] text-white/50 font-mono">
-            {region.timezone}
-          </div>
-          {devInfo && (
-            <div className="mt-1.5 pt-1.5 border-t border-white/10 font-mono text-[9px] sm:text-[10px] text-white/50 space-y-0.5">
-              <div>ISO&nbsp; {devInfo.iso}</div>
-              <div>
-                Unix {devInfo.unix}&nbsp; W{devInfo.week}&nbsp; D{devInfo.dayOfYear}&nbsp; DST {devInfo.isDST ? "✓" : "✗"}
+      {/* Expanded details — always present for smooth animation */}
+      <div
+        className="region-card-expand relative z-10"
+        data-expanded={isActive ? "true" : "false"}
+      >
+        <div className="overflow-hidden">
+          {isActive && (
+            <div className="mt-2 pt-2 border-t border-white/15"
+                 style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
+              <div className="flex items-center justify-between text-[11px] sm:text-xs text-white/80">
+                <span suppressHydrationWarning>{expandedDate}</span>
+                {weather && (
+                  <span className="font-medium">{weather.label}</span>
+                )}
               </div>
-              <div>{devInfo.utcOffset}</div>
+              {sunriseStr && sunsetStr && (
+                <div className="mt-1.5 flex items-center gap-3 text-[11px] sm:text-xs text-white/80" suppressHydrationWarning>
+                  <span>🌅 {sunriseStr}</span>
+                  <span>🌇 {sunsetStr}</span>
+                </div>
+              )}
+              <div className="mt-1 text-[10px] text-white/50 font-mono">
+                {region.timezone}
+              </div>
+              {devInfo && (
+                <div className="mt-1.5 pt-1.5 border-t border-white/10 font-mono text-[9px] sm:text-[10px] text-white/50 space-y-0.5">
+                  <div>ISO&nbsp; {devInfo.iso}</div>
+                  <div>
+                    Unix {devInfo.unix}&nbsp; W{devInfo.week}&nbsp; D{devInfo.dayOfYear}&nbsp; DST {devInfo.isDST ? "✓" : "✗"}
+                  </div>
+                  <div>{devInfo.utcOffset}</div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </button>
   );
 });
