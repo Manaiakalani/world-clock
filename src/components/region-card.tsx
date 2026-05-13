@@ -7,10 +7,13 @@ import {
   getOffsetFromLocal,
   formatOffset,
   isWorkingHours,
+  isAwake,
   getRegionHour,
   getRegionMinute,
   getDayDifference,
   getTimezoneAbbr,
+  getNextDstTransition,
+  getDevInfo,
 } from "@/lib/timezone-utils";
 import { getGradientForHour, gradientToCSS } from "@/lib/sky-gradients";
 import { type WeatherData } from "@/lib/weather";
@@ -24,9 +27,10 @@ interface RegionCardProps {
   is24h?: boolean;
   isLocal?: boolean;
   localTimezone?: string;
+  devMode?: boolean;
 }
 
-export const RegionCard = memo(function RegionCard({ region, now, onClick, isActive, weather, is24h, isLocal, localTimezone }: RegionCardProps) {
+export const RegionCard = memo(function RegionCard({ region, now, onClick, isActive, weather, is24h, isLocal, localTimezone, devMode }: RegionCardProps) {
   const time = formatTime(region.timezone, now, is24h);
   const hour = getRegionHour(region.timezone, now);
   const minute = getRegionMinute(region.timezone, now);
@@ -34,10 +38,15 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
   const offsetStr = isLocal ? "Local" : formatOffset(offset);
   const dayDiff = localTimezone ? getDayDifference(region.timezone, localTimezone, now) : null;
   const working = isWorkingHours(region.timezone, now);
+  const awake = isAwake(region.timezone, now);
   const tzAbbr = getTimezoneAbbr(region.timezone, now);
   const gradient = useMemo(
     () => getGradientForHour(hour + minute / 60),
     [hour, minute]
+  );
+  const dstTransition = useMemo(
+    () => getNextDstTransition(region.timezone, now),
+    [region.timezone, now]
   );
 
   return (
@@ -67,6 +76,9 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
             <span className="text-[13px] sm:text-sm font-semibold leading-tight tracking-tight text-white">
               {region.city}
             </span>
+            <span className="text-[10px] leading-none shrink-0" style={{ textShadow: "none" }}>
+              {awake ? "☀️" : "🌙"}
+            </span>
             {working && (
               <span className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
             )}
@@ -81,6 +93,13 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
               </span>
             ) : (
               <span className="inline-block w-12 h-3 rounded bg-white/20 animate-pulse" />
+            )}
+            {dstTransition && (
+              <span className={`text-[10px] leading-tight ${dstTransition.daysUntil >= 0 ? "text-amber-300/90" : "text-white/50"}`}>
+                ⏰ DST {dstTransition.daysUntil >= 0
+                  ? dstTransition.daysUntil === 0 ? "today" : `in ${dstTransition.daysUntil}d`
+                  : `${Math.abs(dstTransition.daysUntil)}d ago`}
+              </span>
             )}
           </div>
         </div>
@@ -114,9 +133,43 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
               <span className="font-medium">{weather.label}</span>
             )}
           </div>
+          {weather?.sunrise && weather?.sunset && (
+            <div className="mt-1.5 flex items-center gap-3 text-[11px] sm:text-xs text-white/80" suppressHydrationWarning>
+              <span>
+                🌅{" "}
+                {new Intl.DateTimeFormat("en-US", {
+                  timeZone: region.timezone,
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: !is24h,
+                }).format(new Date(weather.sunrise))}
+              </span>
+              <span>
+                🌇{" "}
+                {new Intl.DateTimeFormat("en-US", {
+                  timeZone: region.timezone,
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: !is24h,
+                }).format(new Date(weather.sunset))}
+              </span>
+            </div>
+          )}
           <div className="mt-1 text-[10px] text-white/50 font-mono">
             {region.timezone}
           </div>
+          {devMode && (() => {
+            const dev = getDevInfo(region.timezone, now);
+            return (
+              <div className="mt-1.5 pt-1.5 border-t border-white/10 font-mono text-[9px] sm:text-[10px] text-white/50 space-y-0.5">
+                <div>ISO&nbsp; {dev.iso}</div>
+                <div>
+                  Unix {dev.unix}&nbsp; W{dev.week}&nbsp; D{dev.dayOfYear}&nbsp; DST {dev.isDST ? "✓" : "✗"}
+                </div>
+                <div>{dev.utcOffset}</div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </button>

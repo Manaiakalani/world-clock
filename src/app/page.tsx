@@ -15,6 +15,8 @@ import { RegionList } from "@/components/region-list";
 import { AuroraBackground } from "@/components/aurora-background";
 import { Header } from "@/components/header";
 import { getRegionHour, getRegionMinute, formatTimeFull, getTimezoneAbbr } from "@/lib/timezone-utils";
+import { useCustomOrder } from "@/hooks/use-custom-order";
+import { useDevMode } from "@/hooks/use-dev-mode";
 import { Switch } from "@/components/ui/switch";
 import { Clock, List, Settings2, Moon, Sun, Link2, Check, Calendar, Info, MoreHorizontal, Search } from "lucide-react";
 
@@ -55,6 +57,13 @@ const AboutDialog = dynamic(
     ),
   }
 );
+const TimeSlider = dynamic(
+  () => import("@/components/time-slider").then((m) => m.TimeSlider),
+  {
+    ssr: false,
+    loading: () => <div className="h-12 animate-pulse bg-muted/10 rounded-xl" />,
+  }
+);
 
 export default function WorldClockPage() {
   // Second-precision clock — only the analog clock face needs this tick.
@@ -64,6 +73,8 @@ export default function WorldClockPage() {
   const { theme, setTheme } = useTheme();
   const { activeTimezones, toggle, isActive, loaded, setTimezones, getShareUrl } = useActiveTimezones();
   const { is24h, toggle: toggleTimeFormat } = useTimeFormat();
+  const { customOrder, toggleCustomOrder } = useCustomOrder();
+  const { devMode, toggleDevMode } = useDevMode();
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [showClock, setShowClock] = useState(true);
   const [showManager, setShowManager] = useState(false);
@@ -72,9 +83,21 @@ export default function WorldClockPage() {
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
+  const [showTimeSlider, setShowTimeSlider] = useState(false);
+  const [timeOffset, setTimeOffset] = useState(0);
 
   // Track whether the last open was triggered by keyboard (skip enter animations)
   const openedViaKeyboard = useRef(false);
+
+  // Time travel: when the slider is hidden, reset offset; when active, shift all clocks.
+  const adjustedNow = useMemo(
+    () => (timeOffset === 0 ? now : new Date(now.getTime() + timeOffset * 3600000)),
+    [now, timeOffset],
+  );
+  const adjustedMinute = useMemo(
+    () => (timeOffset === 0 ? nowMinute : new Date(nowMinute.getTime() + timeOffset * 3600000)),
+    [nowMinute, timeOffset],
+  );
 
   const handleShare = useCallback(() => {
     const url = getShareUrl();
@@ -110,9 +133,18 @@ export default function WorldClockPage() {
   // Sky-based marker colors update every minute — driven by the minute-tick clock
   // so the entire region list doesn't re-render every second.
   const regions = useMemo(
-    () => regionsFromTimezones(activeTimezones, nowMinute),
-    [activeTimezones, nowMinute]
+    () => regionsFromTimezones(activeTimezones, adjustedMinute, customOrder),
+    [activeTimezones, adjustedMinute, customOrder]
   );
+
+  const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
+    // Reorder the activeTimezones array based on the current regions order
+    const regionTimezones = regions.map((r) => r.timezone);
+    const reordered = [...regionTimezones];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    setTimezones(reordered);
+  }, [regions, setTimezones]);
 
   const weatherLocations = useMemo(
     () => regions.map((r) => ({ id: r.id, coordinates: r.coordinates })),
@@ -137,18 +169,30 @@ export default function WorldClockPage() {
         openedViaKeyboard.current = true;
         setShowMeetingPlanner((prev) => !prev);
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "t") {
+        e.preventDefault();
+        setShowTimeSlider((prev) => {
+          if (prev) setTimeOffset(0);
+          return !prev;
+        });
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "d") {
+        e.preventDefault();
+        toggleDevMode();
+      }
       if (e.key === "Escape") {
-        if (showMeetingPlanner) setShowMeetingPlanner(false);
+        if (showTimeSlider) { setShowTimeSlider(false); setTimeOffset(0); }
+        else if (showMeetingPlanner) setShowMeetingPlanner(false);
         else if (showManager) setShowManager(false);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showManager, showMeetingPlanner]);
+  }, [showManager, showMeetingPlanner, showTimeSlider, toggleDevMode]);
 
   // Aurora sun direction & header date only need minute precision.
-  const localHour = getRegionHour(localTimezone, nowMinute);
-  const localMinute = getRegionMinute(localTimezone, nowMinute);
+  const localHour = getRegionHour(localTimezone, adjustedMinute);
+  const localMinute = getRegionMinute(localTimezone, adjustedMinute);
   const minuteFraction = localMinute / 60;
 
   if (!loaded) return null;
@@ -164,7 +208,26 @@ export default function WorldClockPage() {
       <div className="absolute inset-0 bg-white/10 dark:bg-background/20" />
 
       <div className="relative z-10 flex h-full flex-col">
-        <Header now={nowMinute} />
+        <Header now={adjustedMinute} />
+
+        {/* Time travel offset indicator + slider */}
+        {showTimeSlider && (
+          <div className="shrink-0 px-4 sm:px-6 lg:px-8 pb-1">
+            {timeOffset !== 0 && (
+              <p className="mb-1 text-center text-xs font-medium text-muted-foreground">
+                Viewing time at{" "}
+                <span className="font-mono font-bold text-foreground">
+                  {timeOffset > 0 ? "+" : ""}{timeOffset}h
+                </span>{" "}
+                from now
+              </p>
+            )}
+            <TimeSlider
+              offsetHours={timeOffset}
+              onOffsetChange={setTimeOffset}
+            />
+          </div>
+        )}
 
         <main id="main-content" className="flex min-h-0 flex-1 flex-col md:flex-row gap-3 px-4 pb-20 sm:pb-3 sm:px-6 lg:gap-6 lg:px-8">
           {/* Globe — left side (hidden on mobile, visible from lg up) */}
@@ -182,14 +245,14 @@ export default function WorldClockPage() {
             {showMeetingPlanner ? (
               <MeetingPlanner
                 regions={regions}
-                now={nowMinute}
+                now={adjustedMinute}
                 onClose={() => setShowMeetingPlanner(false)}
                 instant={openedViaKeyboard.current}
               />
             ) : showManager ? (
               /* Timezone Manager view */
               <TimezoneManager
-                now={nowMinute}
+                now={adjustedMinute}
                 isActive={isActive}
                 onToggle={toggle}
                 onSetTimezones={setTimezones}
@@ -202,7 +265,12 @@ export default function WorldClockPage() {
               <>
                 {/* Panel header */}
                 <div className="flex shrink-0 items-center justify-between">
-                  <h2 className="text-lg font-semibold tracking-tight">Regions</h2>
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-lg font-semibold tracking-tight">Regions</h2>
+                    {devMode && (
+                      <span className="font-mono text-[10px] text-muted-foreground/60 select-none">&lt;/&gt;</span>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-1">
                     <div className="flex items-center gap-1 text-muted-foreground">
@@ -293,15 +361,15 @@ export default function WorldClockPage() {
                   <div className="mx-auto w-full max-w-[180px] shrink-0 sm:max-w-[220px] xl:max-w-[200px] 2xl:max-w-[240px]">
                     <AnalogClock
                       regions={regions}
-                      now={now}
+                      now={adjustedNow}
                       localTimezone={localTimezone}
                       is24h={is24h}
                       className="aspect-square"
                     />
                     <p className="mt-1 text-center font-mono text-sm sm:text-base font-bold tabular-nums tracking-widest" aria-live="polite" aria-atomic="true" suppressHydrationWarning>
-                      {formatTimeFull(localTimezone, now, is24h)}
+                      {formatTimeFull(localTimezone, adjustedNow, is24h)}
                       <span className="ml-1.5 text-[10px] sm:text-xs font-semibold text-muted-foreground/70 tracking-normal">
-                        {getTimezoneAbbr(localTimezone, now)}
+                        {getTimezoneAbbr(localTimezone, adjustedNow)}
                       </span>
                     </p>
                   </div>
@@ -312,7 +380,7 @@ export default function WorldClockPage() {
                   <div className="flex flex-col gap-1.5 sm:gap-2 xl:gap-1.5 2xl:gap-2.5">
                     <RegionList
                       regions={regions}
-                      now={nowMinute}
+                      now={adjustedMinute}
                       activeRegionId={activeRegionId}
                       onRegionClick={(id) =>
                         setActiveRegionId(activeRegionId === id ? null : id)
@@ -320,6 +388,9 @@ export default function WorldClockPage() {
                       weather={weather}
                       is24h={is24h}
                       localTimezone={localTimezone}
+                      customOrder={customOrder}
+                      onReorder={handleReorder}
+                      devMode={devMode}
                     />
                   </div>
                 </div>
@@ -335,7 +406,7 @@ export default function WorldClockPage() {
       {/* Quick search modal */}
       {showQuickSearch && (
         <QuickSearch
-          now={nowMinute}
+          now={adjustedMinute}
           isActive={isActive}
           onToggle={toggle}
           onClose={() => setShowQuickSearch(false)}
@@ -449,6 +520,14 @@ export default function WorldClockPage() {
                 >
                   <span>Share link</span>
                   {copied ? <Check className="h-4 w-4 text-green-500" /> : <Link2 className="h-4 w-4 text-muted-foreground" />}
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => { toggleCustomOrder(); setShowOverflow(false); }}
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-accent active:bg-accent"
+                >
+                  <span>{customOrder ? "Sort by time" : "Custom order"}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground">{customOrder ? "drag" : "UTC"}</span>
                 </button>
                 <button
                   role="menuitem"
