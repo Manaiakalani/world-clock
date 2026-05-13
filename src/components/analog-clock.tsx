@@ -86,7 +86,7 @@ const StaticClockFace = memo(function StaticClockFace() {
   );
 });
 
-export function AnalogClock({
+export const AnalogClock = memo(function AnalogClock({
   regions,
   timeOffset = 0,
   localTimezone,
@@ -109,7 +109,8 @@ export function AnalogClock({
   const minuteAngle = localMinute * 6 + localSecond * 0.1;
   const hourAngle = (localHour % 12) * 30 + localMinute * 0.5;
 
-  // Position region avatars on the clock face at their hour
+  // Region positions only need minute precision — skip recomputation on second ticks
+  const minuteKey = Math.floor(now.getTime() / 60000);
   const regionPositions = useMemo(() => {
     return regions.map((region) => {
       const hour = getRegionHour(region.timezone, now);
@@ -124,7 +125,8 @@ export function AnalogClock({
         time: formatTime(region.timezone, now, is24h),
       };
     });
-  }, [regions, now, is24h]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regions, minuteKey, is24h]);
 
   return (
     <div className={`relative ${className ?? ""}`} suppressHydrationWarning>
@@ -208,4 +210,4 @@ export function AnalogClock({
       </p>
     </div>
   );
-}
+});

@@ -1,11 +1,12 @@
 "use client";
 
+import { memo } from "react";
 import { formatDate } from "@/lib/timezone-utils";
 interface HeaderProps {
   now: Date;
 }
 
-export function Header({ now }: HeaderProps) {
+export const Header = memo(function Header({ now }: HeaderProps) {
   return (
     <header className="flex shrink-0 items-center justify-between px-4 py-2 sm:px-6 sm:py-3 border-b border-white/5">
       <div className="flex items-center gap-3">
@@ -40,4 +41,4 @@ export function Header({ now }: HeaderProps) {
 
     </header>
   );
-}
+});

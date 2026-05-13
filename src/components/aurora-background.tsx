@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, memo } from "react";
 
 interface AuroraBackgroundProps {
   /** Hour of day (0-23) to control sun direction */
@@ -272,7 +272,7 @@ function getSceneParams(hour: number, minuteFraction: number, dark: boolean) {
   return { sunX, sunY, sunZ, bg, intensity };
 }
 
-export function AuroraBackground({
+export const AuroraBackground = memo(function AuroraBackground({
   hour,
   minuteFraction = 0,
   dark = false,
@@ -441,4 +441,4 @@ export function AuroraBackground({
       style={{ width: "100%", height: "100%" }}
     />
   );
-}
+});

@@ -131,14 +131,22 @@ export default function WorldClockPage() {
     [activeTimezones, adjustedMinute, customOrder]
   );
 
+  // Stable click handler — functional setState avoids closing over activeRegionId
+  const handleRegionClick = useCallback((id: string) => {
+    setActiveRegionId((prev) => (prev === id ? null : id));
+  }, []);
+
+  // Use ref for regions so handleReorder doesn't recreate when regions change
+  const regionsRef = useRef(regions);
+  regionsRef.current = regions;
+
   const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
-    // Reorder the activeTimezones array based on the current regions order
-    const regionTimezones = regions.map((r) => r.timezone);
+    const regionTimezones = regionsRef.current.map((r) => r.timezone);
     const reordered = [...regionTimezones];
     const [moved] = reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
     setTimezones(reordered);
-  }, [regions, setTimezones]);
+  }, [setTimezones]);
 
   const weatherLocations = useMemo(
     () => regions.map((r) => ({ id: r.id, coordinates: r.coordinates })),
@@ -382,9 +390,7 @@ export default function WorldClockPage() {
                       regions={regions}
                       now={adjustedMinute}
                       activeRegionId={activeRegionId}
-                      onRegionClick={(id) =>
-                        setActiveRegionId(activeRegionId === id ? null : id)
-                      }
+                      onRegionClick={handleRegionClick}
                       weather={weather}
                       is24h={is24h}
                       localTimezone={localTimezone}
