@@ -71,18 +71,25 @@ export function useWeather(locations: LocationInput[]) {
     });
   }, []);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (signal?: AbortSignal) => {
     if (fetchingRef.current || locations.length === 0) return;
     fetchingRef.current = true;
 
     // Fetch all in parallel with small stagger to avoid rate-limiting
     const results: Record<string, WeatherData> = {};
     const batches: Promise<void>[] = locations.map(async (loc) => {
-      const data = await fetchWeather(loc.coordinates[0], loc.coordinates[1]);
+      const data = await fetchWeather(loc.coordinates[0], loc.coordinates[1], signal);
       if (data) results[loc.id] = data;
     });
 
-    await Promise.all(batches);
+    try {
+      await Promise.all(batches);
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        fetchingRef.current = false;
+        return;
+      }
+    }
     setWeather(results);
     saveCache(results);
     setLoading(false);
@@ -93,6 +100,7 @@ export function useWeather(locations: LocationInput[]) {
   // Initial load — try cache first, then defer the network fetch until the
   // browser is idle so it doesn't compete with first-paint work.
   useEffect(() => {
+    const controller = new AbortController();
     const cached = loadCache();
     if (cached) {
       setWeather(cached.data);
@@ -106,11 +114,12 @@ export function useWeather(locations: LocationInput[]) {
     const w = window as IdleWindow;
     let handle: number | ReturnType<typeof setTimeout>;
     if (typeof w.requestIdleCallback === "function") {
-      handle = w.requestIdleCallback(() => fetchAll(), { timeout: 2000 });
+      handle = w.requestIdleCallback(() => fetchAll(controller.signal), { timeout: 2000 });
     } else {
-      handle = setTimeout(fetchAll, 250);
+      handle = setTimeout(() => fetchAll(controller.signal), 250);
     }
     return () => {
+      controller.abort();
       if (typeof handle === "number" && typeof w.cancelIdleCallback === "function") {
         w.cancelIdleCallback(handle);
       } else {

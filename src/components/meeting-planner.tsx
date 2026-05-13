@@ -9,9 +9,10 @@ interface MeetingPlannerProps {
   regions: Region[];
   now: Date;
   onClose: () => void;
+  instant?: boolean;
 }
 
-export function MeetingPlanner({ regions, now, onClose }: MeetingPlannerProps) {
+export function MeetingPlanner({ regions, now, onClose, instant }: MeetingPlannerProps) {
   const currentLocalHour = new Date().getHours();
   
   const data = useMemo(() => {
@@ -52,7 +53,7 @@ export function MeetingPlanner({ regions, now, onClose }: MeetingPlannerProps) {
   const localOffset = now.getHours() - now.getUTCHours();
   
   return (
-    <div className="flex h-full flex-col">
+    <div className={`flex h-full flex-col${instant ? " no-animate" : ""}`}>
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between pb-3">
         <div>

@@ -123,7 +123,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color 0.3s cubic-bezier(0.23, 1, 0.32, 1), color 0.3s cubic-bezier(0.23, 1, 0.32, 1);
   }
   html {
     @apply font-sans;
@@ -143,7 +143,7 @@ a:focus-visible {
 .bg-background\/50,
 .bg-background\/60,
 .border-border {
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.3s cubic-bezier(0.23, 1, 0.32, 1), border-color 0.3s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /* Emil Kowalski design principles — custom easing curves */
@@ -168,12 +168,38 @@ a:focus-visible {
   animation: cardFadeIn 300ms var(--ease-out) both;
 }
 
+/* Exit animation — faster than enter (Emil Kowalski principle) */
+@keyframes cardFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.region-card-exit {
+  animation: cardFadeOut 200ms var(--ease-out) both;
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .region-card-enter {
     animation: none;
     opacity: 1;
   }
+  .region-card-exit {
+    animation: none;
+  }
+}
+
+/* Suppress enter animation for keyboard-triggered surfaces */
+.no-animate,
+.no-animate * {
+  animation: none !important;
+  transition: none !important;
 }
 
 /* Touch device hover safety */

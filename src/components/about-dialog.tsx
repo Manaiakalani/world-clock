@@ -4,19 +4,20 @@ import { X, Github, Keyboard, Shield } from "lucide-react";
 
 interface AboutDialogProps {
   onClose: () => void;
+  instant?: boolean;
 }
 
-export function AboutDialog({ onClose }: AboutDialogProps) {
+export function AboutDialog({ onClose, instant }: AboutDialogProps) {
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm${instant ? " no-animate" : ""}`}
         onClick={onClose}
       />
 
       {/* Dialog */}
-      <div className="fixed inset-x-0 top-[10%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden">
+      <div className={`fixed inset-x-0 top-[10%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden${instant ? " no-animate" : ""}`}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
