@@ -74,11 +74,12 @@ interface OpenMeteoResponse {
 
 export async function fetchWeather(
   lat: number,
-  lon: number
+  lon: number,
+  signal?: AbortSignal
 ): Promise<WeatherData | null> {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal });
     if (!res.ok) return null;
     const data: OpenMeteoResponse = await res.json();
     if (!data.current) return null;

@@ -1,13 +1,18 @@
 import { ALL_TIMEZONES, type TimezoneEntry } from "@/data/timezone-data";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
-import { getRegionHour, getRegionMinute } from "@/lib/timezone-utils";
+import { getRegionHour, getRegionMinute, getRegionTime } from "@/lib/timezone-utils";
 import { getGradientForHour } from "@/lib/sky-gradients";
 
-// Get UTC offset in minutes for a timezone (negative = west, positive = east)
+// Pre-index for O(1) lookups instead of O(n) .find() per timezone
+const TIMEZONE_INDEX = new Map<string, TimezoneEntry>(
+  ALL_TIMEZONES.map((tz) => [tz.timezone, tz])
+);
+
+// Get UTC offset in milliseconds for a timezone
 function getUtcOffset(timezone: string, now: Date): number {
-  const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
-  const tzStr = now.toLocaleString("en-US", { timeZone: timezone });
-  return new Date(tzStr).getTime() - new Date(utcStr).getTime();
+  const utcDate = getRegionTime("UTC", now);
+  const tzDate = getRegionTime(timezone, now);
+  return tzDate.getTime() - utcDate.getTime();
 }
 
 export interface Region {
@@ -43,7 +48,7 @@ export function regionsFromTimezones(timezoneIds: string[], now?: Date): Region[
   const currentTime = now ?? new Date();
   return timezoneIds
     .map((tzId) => {
-      const entry = ALL_TIMEZONES.find((t) => t.timezone === tzId);
+      const entry = TIMEZONE_INDEX.get(tzId);
       if (!entry) return null;
       return {
         id: tzId.replace(/\//g, "-").toLowerCase(),

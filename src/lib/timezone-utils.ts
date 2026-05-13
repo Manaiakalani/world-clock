@@ -1,6 +1,19 @@
+// Module-level cache for Intl.DateTimeFormat instances (expensive to construct)
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function getCachedFormatter(locale: string | undefined, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale ?? "default"}|${JSON.stringify(options)}`;
+  let fmt = formatterCache.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, options);
+    formatterCache.set(key, fmt);
+  }
+  return fmt;
+}
+
 // Combined time parts — single Intl.DateTimeFormat call instead of 3 separate ones
 export function getRegionTimeParts(timezone: string, now: Date = new Date()): { hour: number; minute: number; second: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  const parts = getCachedFormatter("en-US", {
     timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
@@ -16,8 +29,18 @@ export function getRegionTimeParts(timezone: string, now: Date = new Date()): { 
 }
 
 export function getRegionTime(timezone: string, now: Date = new Date()): Date {
-  const str = now.toLocaleString("en-US", { timeZone: timezone });
-  return new Date(str);
+  const parts = getCachedFormatter("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
 }
 
 export function getRegionHour(timezone: string, now: Date = new Date()): number {
@@ -33,7 +56,7 @@ export function getRegionSecond(timezone: string, now: Date = new Date()): numbe
 }
 
 export function formatTime(timezone: string, now: Date = new Date(), is24h: boolean = false): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return getCachedFormatter("en-US", {
     timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
@@ -42,7 +65,7 @@ export function formatTime(timezone: string, now: Date = new Date(), is24h: bool
 }
 
 export function formatTimeFull(timezone: string, now: Date = new Date(), is24h: boolean = false): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return getCachedFormatter("en-US", {
     timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
@@ -55,12 +78,9 @@ export function getOffsetFromLocal(
   timezone: string,
   now: Date = new Date()
 ): number {
-  const localStr = now.toLocaleString("en-US", {
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  });
-  const remoteStr = now.toLocaleString("en-US", { timeZone: timezone });
-  const localDate = new Date(localStr);
-  const remoteDate = new Date(remoteStr);
+  const localTz = getCachedFormatter(undefined, {}).resolvedOptions().timeZone;
+  const localDate = getRegionTime(localTz, now);
+  const remoteDate = getRegionTime(timezone, now);
   return Math.round((remoteDate.getTime() - localDate.getTime()) / (1000 * 60 * 60));
 }
 
@@ -77,7 +97,7 @@ export function isWorkingHours(timezone: string, now: Date = new Date()): boolea
 }
 
 export function formatDate(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-US", {
+  return getCachedFormatter("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -86,30 +106,26 @@ export function formatDate(now: Date = new Date()): string {
 }
 
 export function getDayDifference(timezone: string, localTimezone: string, now: Date = new Date()): string | null {
-  const localDate = new Intl.DateTimeFormat("en-US", {
-    timeZone: localTimezone,
+  const opts: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
+  };
 
-  const remoteDate = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  // Use formatToParts for locale-safe date extraction
+  const getDay = (tz: string) => {
+    const parts = getCachedFormatter("en-US", { ...opts, timeZone: tz }).formatToParts(now);
+    const year = parseInt(parts.find((p) => p.type === "year")!.value);
+    const month = parseInt(parts.find((p) => p.type === "month")!.value);
+    const day = parseInt(parts.find((p) => p.type === "day")!.value);
+    return new Date(year, month - 1, day).getTime();
+  };
 
-  if (localDate === remoteDate) return null;
+  const localD = getDay(localTimezone);
+  const remoteD = getDay(timezone);
+  if (localD === remoteD) return null;
 
-  // Parse dates to compare
-  const [lm, ld, ly] = localDate.split("/").map(Number);
-  const [rm, rd, ry] = remoteDate.split("/").map(Number);
-  const localD = new Date(ly, lm - 1, ld);
-  const remoteD = new Date(ry, rm - 1, rd);
-
-  const diffMs = remoteD.getTime() - localD.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round((remoteD - localD) / 86400000);
 
   if (diffDays === 1) return "Tomorrow";
   if (diffDays === -1) return "Yesterday";
@@ -119,7 +135,7 @@ export function getDayDifference(timezone: string, localTimezone: string, now: D
 }
 
 export function getTimezoneAbbr(timezone: string, now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  const parts = getCachedFormatter("en-US", {
     timeZone: timezone,
     timeZoneName: "short",
   }).formatToParts(now);

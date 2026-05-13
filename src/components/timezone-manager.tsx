@@ -22,6 +22,7 @@ interface TimezoneManagerProps {
   onSetTimezones: (tzs: string[]) => void;
   onClose: () => void;
   is24h?: boolean;
+  instant?: boolean;
 }
 
 export function TimezoneManager({
@@ -31,6 +32,7 @@ export function TimezoneManager({
   onSetTimezones,
   onClose,
   is24h,
+  instant,
 }: TimezoneManagerProps) {
   const [search, setSearch] = useState("");
   const [expandedContinent, setExpandedContinent] = useState<string | null>(null);
@@ -55,10 +57,13 @@ export function TimezoneManager({
     return map;
   }, [filtered]);
 
-  const activeCount = ALL_TIMEZONES.filter((tz) => isActive(tz.timezone)).length;
+  const activeCount = useMemo(
+    () => ALL_TIMEZONES.filter((tz) => isActive(tz.timezone)).length,
+    [isActive]
+  );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={`flex h-full flex-col${instant ? " no-animate" : ""}`}>
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2 pb-3">
         <button

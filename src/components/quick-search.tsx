@@ -12,9 +12,10 @@ interface QuickSearchProps {
   onToggle: (tz: string) => void;
   onClose: () => void;
   is24h?: boolean;
+  instant?: boolean;
 }
 
-export function QuickSearch({ now, isActive, onToggle, onClose, is24h }: QuickSearchProps) {
+export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }: QuickSearchProps) {
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -79,12 +80,12 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h }: QuickSe
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm${instant ? " no-animate" : ""}`}
         onClick={onClose}
       />
 
       {/* Dialog */}
-      <div className="fixed inset-x-0 top-[15%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden">
+      <div className={`fixed inset-x-0 top-[15%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden${instant ? " no-animate" : ""}`}>
         {/* Search input */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <Search className="h-4 w-4 text-muted-foreground shrink-0" />

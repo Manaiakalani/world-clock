@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, memo } from "react";
-import createGlobe from "cobe";
+import type { Globe } from "cobe";
 import { type Region, generateArcs } from "@/data/regions";
 
 interface GlobeViewerProps {
@@ -13,7 +13,7 @@ interface GlobeViewerProps {
 
 export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, className, dark = true }: GlobeViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const globeRef = useRef<ReturnType<typeof createGlobe> | null>(null);
+  const globeRef = useRef<Globe | null>(null);
   const phiRef = useRef(0);
   const targetPhiRef = useRef<number | null>(null);
   const pointerInteracting = useRef(false);
@@ -39,6 +39,10 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    let cancelled = false;
+    let globe: Globe | null = null;
+    let handleVisibility: (() => void) | null = null;
 
     const arcs = generateArcs(regions);
     widthRef.current = canvas.offsetWidth;
@@ -66,103 +70,108 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
           mapBaseBrightness: 0.1,
         };
 
-    const globe = createGlobe(canvas, {
-      devicePixelRatio: Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio : 1),
-      width: widthRef.current * 2,
-      height: widthRef.current * 2,
-      phi: phiRef.current,
-      theta: 0.15,
-      dark: config.dark,
-      diffuse: config.diffuse,
-      mapSamples: 20000,
-      mapBrightness: config.mapBrightness,
-      mapBaseBrightness: config.mapBaseBrightness,
-      baseColor: config.baseColor,
-      markerColor: config.markerColor,
-      glowColor: config.glowColor,
-      markers: regions.map((r) => ({
-        location: r.coordinates,
-        size: 0.08,
-        color: r.color,
-        id: r.id,
-      })),
-      arcs: arcs.map((arc) => ({
-        from: arc.from,
-        to: arc.to,
-      })),
-      arcColor: config.arcColor,
-      arcWidth: 0.4,
-      arcHeight: 0.3,
-      scale: 1.05,
-      opacity: 1,
-    });
+    import("cobe").then(({ default: createGlobe }) => {
+      if (cancelled) return;
 
-    globeRef.current = globe;
-
-    // Throttled resize check — only read offsetWidth every 60 frames
-    let frameCount = 0;
-
-    function animate() {
-      if (!pointerInteracting.current) {
-        if (targetPhiRef.current !== null) {
-          const diff = targetPhiRef.current - phiRef.current;
-          const normalizedDiff =
-            ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
-          phiRef.current += normalizedDiff * 0.08;
-          if (Math.abs(normalizedDiff) < 0.01) {
-            targetPhiRef.current = null;
-          }
-        } else {
-          phiRef.current += 0.003;
-        }
-      }
-
-      // Only check for resize every 60 frames (~1s at 60fps)
-      frameCount++;
-      if (frameCount % 60 === 0) {
-        const newWidth = canvas!.offsetWidth;
-        if (newWidth !== widthRef.current) {
-          widthRef.current = newWidth;
-        }
-      }
-
-      globe.update({
-        phi: phiRef.current,
+      globe = createGlobe(canvas, {
+        devicePixelRatio: Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio : 1),
         width: widthRef.current * 2,
         height: widthRef.current * 2,
-        markers: regionsRef.current.map((r) => ({
+        phi: phiRef.current,
+        theta: 0.15,
+        dark: config.dark,
+        diffuse: config.diffuse,
+        mapSamples: 20000,
+        mapBrightness: config.mapBrightness,
+        mapBaseBrightness: config.mapBaseBrightness,
+        baseColor: config.baseColor,
+        markerColor: config.markerColor,
+        glowColor: config.glowColor,
+        markers: regions.map((r) => ({
           location: r.coordinates,
           size: 0.08,
           color: r.color,
           id: r.id,
         })),
-        arcs: arcsRef.current.map((arc) => ({
+        arcs: arcs.map((arc) => ({
           from: arc.from,
           to: arc.to,
         })),
+        arcColor: config.arcColor,
+        arcWidth: 0.4,
+        arcHeight: 0.3,
+        scale: 1.05,
+        opacity: 1,
       });
 
-      rafRef.current = requestAnimationFrame(animate);
-    }
+      globeRef.current = globe;
 
-    rafRef.current = requestAnimationFrame(animate);
+      // Throttled resize check — only read offsetWidth every 60 frames
+      let frameCount = 0;
 
-    const handleVisibility = () => {
-      if (document.hidden) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = 0;
-      } else {
-        if (!rafRef.current) {
-          rafRef.current = requestAnimationFrame(animate);
+      function animate() {
+        if (!pointerInteracting.current) {
+          if (targetPhiRef.current !== null) {
+            const diff = targetPhiRef.current - phiRef.current;
+            const normalizedDiff =
+              ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
+            phiRef.current += normalizedDiff * 0.08;
+            if (Math.abs(normalizedDiff) < 0.01) {
+              targetPhiRef.current = null;
+            }
+          } else {
+            phiRef.current += 0.003;
+          }
         }
+
+        // Only check for resize every 60 frames (~1s at 60fps)
+        frameCount++;
+        if (frameCount % 60 === 0) {
+          const newWidth = canvas!.offsetWidth;
+          if (newWidth !== widthRef.current) {
+            widthRef.current = newWidth;
+          }
+        }
+
+        globe!.update({
+          phi: phiRef.current,
+          width: widthRef.current * 2,
+          height: widthRef.current * 2,
+          markers: regionsRef.current.map((r) => ({
+            location: r.coordinates,
+            size: 0.08,
+            color: r.color,
+            id: r.id,
+          })),
+          arcs: arcsRef.current.map((arc) => ({
+            from: arc.from,
+            to: arc.to,
+          })),
+        });
+
+        rafRef.current = requestAnimationFrame(animate);
       }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
+
+      rafRef.current = requestAnimationFrame(animate);
+
+      handleVisibility = () => {
+        if (document.hidden) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        } else {
+          if (!rafRef.current) {
+            rafRef.current = requestAnimationFrame(animate);
+          }
+        }
+      };
+      document.addEventListener("visibilitychange", handleVisibility);
+    });
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(rafRef.current);
-      document.removeEventListener("visibilitychange", handleVisibility);
-      globe.destroy();
+      if (handleVisibility) document.removeEventListener("visibilitychange", handleVisibility);
+      if (globe) globe.destroy();
     };
   }, [dark]);
 

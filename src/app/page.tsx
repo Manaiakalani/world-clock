@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import { useCurrentTime } from "@/hooks/use-current-time";
@@ -21,19 +21,39 @@ import { Clock, List, Settings2, Moon, Sun, Link2, Check, Calendar, Info, MoreHo
 // Modal/conditional surfaces — lazy-loaded so they don't ship in the initial bundle.
 const TimezoneManager = dynamic(
   () => import("@/components/timezone-manager").then((m) => m.TimezoneManager),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <div className="h-full animate-pulse bg-muted/10 rounded-xl" />,
+  }
 );
 const MeetingPlanner = dynamic(
   () => import("@/components/meeting-planner").then((m) => m.MeetingPlanner),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <div className="h-full animate-pulse bg-muted/10 rounded-xl" />,
+  }
 );
 const QuickSearch = dynamic(
   () => import("@/components/quick-search").then((m) => m.QuickSearch),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15%]">
+        <div className="w-[90%] max-w-md h-48 animate-pulse bg-muted/10 rounded-xl border border-border" />
+      </div>
+    ),
+  }
 );
 const AboutDialog = dynamic(
   () => import("@/components/about-dialog").then((m) => m.AboutDialog),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10%]">
+        <div className="w-[90%] max-w-md h-64 animate-pulse bg-muted/10 rounded-xl border border-border" />
+      </div>
+    ),
+  }
 );
 
 export default function WorldClockPage() {
@@ -52,6 +72,9 @@ export default function WorldClockPage() {
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
+
+  // Track whether the last open was triggered by keyboard (skip enter animations)
+  const openedViaKeyboard = useRef(false);
 
   const handleShare = useCallback(() => {
     const url = getShareUrl();
@@ -101,14 +124,17 @@ export default function WorldClockPage() {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
+        openedViaKeyboard.current = true;
         setShowQuickSearch((prev) => !prev);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
+        openedViaKeyboard.current = true;
         setShowManager((prev) => !prev);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "m") {
         e.preventDefault();
+        openedViaKeyboard.current = true;
         setShowMeetingPlanner((prev) => !prev);
       }
       if (e.key === "Escape") {
@@ -158,6 +184,7 @@ export default function WorldClockPage() {
                 regions={regions}
                 now={nowMinute}
                 onClose={() => setShowMeetingPlanner(false)}
+                instant={openedViaKeyboard.current}
               />
             ) : showManager ? (
               /* Timezone Manager view */
@@ -168,6 +195,7 @@ export default function WorldClockPage() {
                 onSetTimezones={setTimezones}
                 onClose={() => setShowManager(false)}
                 is24h={is24h}
+                instant={openedViaKeyboard.current}
               />
             ) : (
               /* Main view: clock + region cards */
@@ -199,7 +227,7 @@ export default function WorldClockPage() {
                       {is24h ? "24" : "12"}
                     </button>
                     <button
-                      onClick={() => { setShowManager(true); setShowMeetingPlanner(false); }}
+                      onClick={() => { openedViaKeyboard.current = false; setShowManager(true); setShowMeetingPlanner(false); }}
                       className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
@@ -209,7 +237,7 @@ export default function WorldClockPage() {
                       <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
                     <button
-                      onClick={() => { setShowMeetingPlanner(true); setShowManager(false); }}
+                      onClick={() => { openedViaKeyboard.current = false; setShowMeetingPlanner(true); setShowManager(false); }}
                       className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
@@ -247,7 +275,7 @@ export default function WorldClockPage() {
                       )}
                     </button>
                     <button
-                      onClick={() => setShowAbout(true)}
+                      onClick={() => { openedViaKeyboard.current = false; setShowAbout(true); }}
                       className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
@@ -302,7 +330,7 @@ export default function WorldClockPage() {
       </div>
 
       {/* About dialog */}
-      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} instant={openedViaKeyboard.current} />}
 
       {/* Quick search modal */}
       {showQuickSearch && (
@@ -312,6 +340,7 @@ export default function WorldClockPage() {
           onToggle={toggle}
           onClose={() => setShowQuickSearch(false)}
           is24h={is24h}
+          instant={openedViaKeyboard.current}
         />
       )}
 
@@ -326,7 +355,7 @@ export default function WorldClockPage() {
         >
           <div className="flex items-center justify-around px-2 py-1.5">
             <button
-              onClick={() => setShowQuickSearch(true)}
+              onClick={() => { openedViaKeyboard.current = false; setShowQuickSearch(true); }}
               className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
                          text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
                          transition-transform duration-160"
@@ -337,7 +366,7 @@ export default function WorldClockPage() {
               <span className="leading-none">Search</span>
             </button>
             <button
-              onClick={() => { setShowManager(true); setShowOverflow(false); }}
+              onClick={() => { openedViaKeyboard.current = false; setShowManager(true); setShowOverflow(false); }}
               className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
                          text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
                          transition-transform duration-160"
@@ -348,7 +377,7 @@ export default function WorldClockPage() {
               <span className="leading-none">Manage</span>
             </button>
             <button
-              onClick={() => { setShowMeetingPlanner(true); setShowOverflow(false); }}
+              onClick={() => { openedViaKeyboard.current = false; setShowMeetingPlanner(true); setShowOverflow(false); }}
               className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
                          text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
                          transition-transform duration-160"
@@ -395,6 +424,7 @@ export default function WorldClockPage() {
                 role="menu"
                 className="absolute right-2 bottom-[calc(100%+8px)] z-20 w-44 rounded-xl border border-border
                            bg-popover/95 backdrop-blur-md shadow-lg overflow-hidden"
+                style={{ transformOrigin: "bottom right" }}
               >
                 <button
                   role="menuitem"
@@ -422,7 +452,7 @@ export default function WorldClockPage() {
                 </button>
                 <button
                   role="menuitem"
-                  onClick={() => { setShowAbout(true); setShowOverflow(false); }}
+                  onClick={() => { openedViaKeyboard.current = false; setShowAbout(true); setShowOverflow(false); }}
                   className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-accent active:bg-accent"
                 >
                   <span>About</span>
