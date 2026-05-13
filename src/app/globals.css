@@ -202,6 +202,45 @@ a:focus-visible {
   transition: none !important;
 }
 
+/* Smooth card expand/collapse */
+.region-card-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 250ms var(--ease-out);
+}
+.region-card-expand[data-expanded="true"] {
+  grid-template-rows: 1fr;
+}
+.region-card-expand > div {
+  min-height: 0;
+}
+
+/* Weather loading shimmer — subtler than pulse */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.weather-shimmer {
+  background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Overflow menu pop-in */
+@keyframes menuPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.overflow-menu-enter {
+  animation: menuPopIn 180ms var(--ease-out) both;
+}
+
 /* Touch device hover safety */
 @media (hover: hover) and (pointer: fine) {
   .region-card:hover {
@@ -266,6 +305,18 @@ nextjs-portal {
 @media (hover: none) and (pointer: coarse) {
   .region-card:active {
     opacity: 0.85;
+  }
+  /* Larger touch target for slider thumb */
+  .slider-thumb {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+}
+
+/* Subtle card glow on pointer hover */
+@media (hover: hover) and (pointer: fine) {
+  .region-card:hover {
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.08);
   }
 }
 

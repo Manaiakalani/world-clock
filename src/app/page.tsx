@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
-import { useCurrentTime } from "@/hooks/use-current-time";
 import { useCurrentMinute } from "@/hooks/use-current-minute";
 import { useActiveTimezones } from "@/hooks/use-active-timezones";
 import { useTimeFormat } from "@/hooks/use-time-format";
@@ -14,7 +13,7 @@ import { AnalogClock } from "@/components/analog-clock";
 import { RegionList } from "@/components/region-list";
 import { AuroraBackground } from "@/components/aurora-background";
 import { Header } from "@/components/header";
-import { getRegionHour, getRegionMinute, formatTimeFull, getTimezoneAbbr } from "@/lib/timezone-utils";
+import { getRegionHour, getRegionMinute } from "@/lib/timezone-utils";
 import { useCustomOrder } from "@/hooks/use-custom-order";
 import { useDevMode } from "@/hooks/use-dev-mode";
 import { Switch } from "@/components/ui/switch";
@@ -66,9 +65,8 @@ const TimeSlider = dynamic(
 );
 
 export default function WorldClockPage() {
-  // Second-precision clock — only the analog clock face needs this tick.
-  const now = useCurrentTime(1000);
-  // Minute-precision clock — drives everything else (regions, sky, weather, chrome).
+  // Minute-precision clock — drives everything (regions, sky, weather, chrome).
+  // The AnalogClock self-subscribes to its own 1s timer internally.
   const nowMinute = useCurrentMinute();
   const { theme, setTheme } = useTheme();
   const { activeTimezones, toggle, isActive, loaded, setTimezones, getShareUrl } = useActiveTimezones();
@@ -89,11 +87,7 @@ export default function WorldClockPage() {
   // Track whether the last open was triggered by keyboard (skip enter animations)
   const openedViaKeyboard = useRef(false);
 
-  // Time travel: when the slider is hidden, reset offset; when active, shift all clocks.
-  const adjustedNow = useMemo(
-    () => (timeOffset === 0 ? now : new Date(now.getTime() + timeOffset * 3600000)),
-    [now, timeOffset],
-  );
+  // Time travel: shift all minute-precision clocks.
   const adjustedMinute = useMemo(
     () => (timeOffset === 0 ? nowMinute : new Date(nowMinute.getTime() + timeOffset * 3600000)),
     [nowMinute, timeOffset],
@@ -368,22 +362,16 @@ export default function WorldClockPage() {
                   </div>
                 </div>
 
-                {/* Analog clock */}
+                {/* Analog clock — self-ticking at 1s internally */}
                 {showClock && (
-                  <div className="mx-auto w-full max-w-[180px] shrink-0 sm:max-w-[220px] xl:max-w-[200px] 2xl:max-w-[240px]">
+                  <div className="mx-auto w-full max-w-[160px] shrink-0 sm:max-w-[220px] xl:max-w-[200px] 2xl:max-w-[240px]">
                     <AnalogClock
                       regions={regions}
-                      now={adjustedNow}
+                      timeOffset={timeOffset}
                       localTimezone={localTimezone}
                       is24h={is24h}
                       className="aspect-square"
                     />
-                    <p className="mt-1 text-center font-mono text-sm sm:text-base font-bold tabular-nums tracking-widest" aria-live="polite" aria-atomic="true" suppressHydrationWarning>
-                      {formatTimeFull(localTimezone, adjustedNow, is24h)}
-                      <span className="ml-1.5 text-[10px] sm:text-xs font-semibold text-muted-foreground/70 tracking-normal">
-                        {getTimezoneAbbr(localTimezone, adjustedNow)}
-                      </span>
-                    </p>
                   </div>
                 )}
 
@@ -505,7 +493,7 @@ export default function WorldClockPage() {
               />
               <div
                 role="menu"
-                className="absolute right-2 bottom-[calc(100%+8px)] z-20 w-44 rounded-xl border border-border
+                className="overflow-menu-enter absolute right-2 bottom-[calc(100%+8px)] z-20 w-44 rounded-xl border border-border
                            bg-popover/95 backdrop-blur-md shadow-lg overflow-hidden"
                 style={{ transformOrigin: "bottom right" }}
               >

@@ -158,8 +158,8 @@ export function TimeSlider({
         {/* Thumb */}
         <div
           className={cn(
-            "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 rounded-full border-2 border-primary bg-background shadow-md",
-            "transition-[box-shadow] duration-200",
+            "slider-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 rounded-full border-2 border-primary bg-background shadow-md",
+            "transition-[box-shadow,transform] duration-200",
             isDragging && "shadow-lg ring-2 ring-primary/30 scale-110",
           )}
           style={{
