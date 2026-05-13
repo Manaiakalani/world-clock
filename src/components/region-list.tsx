@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, memo } from "react";
 import { Region } from "@/data/regions";
 import { RegionCard } from "./region-card";
 import type { WeatherData } from "@/lib/weather";
@@ -19,7 +19,7 @@ interface RegionListProps {
   devMode?: boolean;
 }
 
-export function RegionList({
+export const RegionList = memo(function RegionList({
   regions,
   now,
   activeRegionId,
@@ -120,4 +120,4 @@ export function RegionList({
       ))}
     </div>
   );
-}
+});
