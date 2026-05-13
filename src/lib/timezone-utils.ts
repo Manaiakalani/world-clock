@@ -190,6 +190,24 @@ export function getNextDstTransition(
   return null;
 }
 
+export function formatDateLong(timezone: string, now: Date = new Date()): string {
+  return getCachedFormatter("en-US", {
+    timeZone: timezone,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(now);
+}
+
+export function formatSunTime(timezone: string, isoString: string, is24h?: boolean): string {
+  return getCachedFormatter("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: !is24h,
+  }).format(new Date(isoString));
+}
+
 export function getTimezoneAbbr(timezone: string, now: Date = new Date()): string {
   const parts = getCachedFormatter("en-US", {
     timeZone: timezone,

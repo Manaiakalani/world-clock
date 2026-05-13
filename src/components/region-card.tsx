@@ -14,6 +14,8 @@ import {
   getTimezoneAbbr,
   getNextDstTransition,
   getDevInfo,
+  formatDateLong,
+  formatSunTime,
 } from "@/lib/timezone-utils";
 import { getGradientForHour, gradientToCSS } from "@/lib/sky-gradients";
 import { type WeatherData } from "@/lib/weather";
@@ -44,9 +46,33 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
     () => getGradientForHour(hour + minute / 60),
     [hour, minute]
   );
+
+  // DST transitions are stable within a day — only recompute when the date changes
+  const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
   const dstTransition = useMemo(
     () => getNextDstTransition(region.timezone, now),
-    [region.timezone, now]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [region.timezone, dayKey]
+  );
+
+  // Expanded-only computations — memoized to avoid work on collapsed cards
+  const expandedDate = useMemo(
+    () => isActive ? formatDateLong(region.timezone, now) : "",
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isActive, region.timezone, dayKey]
+  );
+  const sunriseStr = useMemo(
+    () => isActive && weather?.sunrise ? formatSunTime(region.timezone, weather.sunrise, is24h) : "",
+    [isActive, region.timezone, weather?.sunrise, is24h]
+  );
+  const sunsetStr = useMemo(
+    () => isActive && weather?.sunset ? formatSunTime(region.timezone, weather.sunset, is24h) : "",
+    [isActive, region.timezone, weather?.sunset, is24h]
+  );
+  const devInfo = useMemo(
+    () => isActive && devMode ? getDevInfo(region.timezone, now) : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isActive, devMode, region.timezone, minute]
   );
 
   return (
@@ -121,55 +147,29 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
         <div className="relative z-10 mt-2 pt-2 border-t border-white/15"
              style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
           <div className="flex items-center justify-between text-[11px] sm:text-xs text-white/80">
-            <span suppressHydrationWarning>
-              {new Intl.DateTimeFormat("en-US", {
-                timeZone: region.timezone,
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              }).format(now)}
-            </span>
+            <span suppressHydrationWarning>{expandedDate}</span>
             {weather && (
               <span className="font-medium">{weather.label}</span>
             )}
           </div>
-          {weather?.sunrise && weather?.sunset && (
+          {sunriseStr && sunsetStr && (
             <div className="mt-1.5 flex items-center gap-3 text-[11px] sm:text-xs text-white/80" suppressHydrationWarning>
-              <span>
-                🌅{" "}
-                {new Intl.DateTimeFormat("en-US", {
-                  timeZone: region.timezone,
-                  hour: "numeric",
-                  minute: "2-digit",
-                  hour12: !is24h,
-                }).format(new Date(weather.sunrise))}
-              </span>
-              <span>
-                🌇{" "}
-                {new Intl.DateTimeFormat("en-US", {
-                  timeZone: region.timezone,
-                  hour: "numeric",
-                  minute: "2-digit",
-                  hour12: !is24h,
-                }).format(new Date(weather.sunset))}
-              </span>
+              <span>🌅 {sunriseStr}</span>
+              <span>🌇 {sunsetStr}</span>
             </div>
           )}
           <div className="mt-1 text-[10px] text-white/50 font-mono">
             {region.timezone}
           </div>
-          {devMode && (() => {
-            const dev = getDevInfo(region.timezone, now);
-            return (
-              <div className="mt-1.5 pt-1.5 border-t border-white/10 font-mono text-[9px] sm:text-[10px] text-white/50 space-y-0.5">
-                <div>ISO&nbsp; {dev.iso}</div>
-                <div>
-                  Unix {dev.unix}&nbsp; W{dev.week}&nbsp; D{dev.dayOfYear}&nbsp; DST {dev.isDST ? "✓" : "✗"}
-                </div>
-                <div>{dev.utcOffset}</div>
+          {devInfo && (
+            <div className="mt-1.5 pt-1.5 border-t border-white/10 font-mono text-[9px] sm:text-[10px] text-white/50 space-y-0.5">
+              <div>ISO&nbsp; {devInfo.iso}</div>
+              <div>
+                Unix {devInfo.unix}&nbsp; W{devInfo.week}&nbsp; D{devInfo.dayOfYear}&nbsp; DST {devInfo.isDST ? "✓" : "✗"}
               </div>
-            );
-          })()}
+              <div>{devInfo.utcOffset}</div>
+            </div>
+          )}
         </div>
       )}
     </button>
