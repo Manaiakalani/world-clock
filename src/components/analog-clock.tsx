@@ -31,8 +31,8 @@ const TICK_MARKS = Array.from({ length: 60 }, (_, i) => {
   const angleDeg = i * 6 - 90;
   const angleRad = (angleDeg * Math.PI) / 180;
   const isHour = i % 5 === 0;
-  const r1 = isHour ? 68 : 72;
-  const r2 = 76;
+  const r1 = isHour ? 70 : 74;
+  const r2 = 78;
   return {
     key: i,
     x1: r(100 + r1 * Math.cos(angleRad)),
@@ -47,7 +47,7 @@ const HOUR_NUMBERS = Array.from({ length: 12 }, (_, i) => {
   const num = i + 1;
   const angleDeg = num * 30 - 90;
   const angleRad = (angleDeg * Math.PI) / 180;
-  const rad = 84;
+  const rad = 86;
   return {
     num,
     x: r(100 + rad * Math.cos(angleRad)),
@@ -60,13 +60,15 @@ const StaticClockFace = memo(function StaticClockFace() {
   return (
     <>
       <circle cx="100" cy="100" r="96" className="fill-background/60" />
-      <circle cx="100" cy="100" r="96" fill="none" className="stroke-foreground/20" strokeWidth="2" />
+      <circle cx="100" cy="100" r="96" fill="none" className="stroke-foreground/15" strokeWidth="1.5" />
+      {/* Faint inner guide where flag avatars sit — anchors the eye */}
+      <circle cx="100" cy="100" r="50" fill="none" className="stroke-foreground/8" strokeWidth="0.5" strokeDasharray="1 3" />
       {TICK_MARKS.map((t) => (
         <line
           key={t.key}
           x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-          className={t.isHour ? "stroke-foreground" : "stroke-muted-foreground/40"}
-          strokeWidth={t.isHour ? 2.5 : 0.75}
+          className={t.isHour ? "stroke-foreground/85" : "stroke-muted-foreground/30"}
+          strokeWidth={t.isHour ? 1.75 : 0.6}
           strokeLinecap="round"
         />
       ))}
@@ -76,8 +78,8 @@ const StaticClockFace = memo(function StaticClockFace() {
           x={h.x} y={h.y}
           textAnchor="middle"
           dominantBaseline="central"
-          className="fill-foreground text-[15px] font-extrabold"
-          style={{ fontFamily: "var(--font-sans)" }}
+          className="fill-foreground/85 text-[11px] font-semibold"
+          style={{ fontFamily: "var(--font-sans)", letterSpacing: "-0.02em" }}
         >
           {h.num}
         </text>
@@ -85,6 +87,98 @@ const StaticClockFace = memo(function StaticClockFace() {
     </>
   );
 });
+
+/**
+ * Lay out region avatars on the clock with cluster-aware radial stacking.
+ *
+ * 1. Compute each region's angular position from its local hour+minute.
+ * 2. Group neighbors that fall within `clusterWindowDeg` of each other.
+ * 3. Place each cluster along a single radial spoke at the cluster's mean
+ *    angle, stacking members from inner to outer radius — like beads on a
+ *    string. This matches the iOS Clock convention and prevents the
+ *    flag-on-flag overlap that compromises the dial when many cities sit
+ *    in the same hour bucket (e.g. Sydney + Tokyo near 5–7).
+ *
+ * Coordinates are in container percentage space (50,50 = center).
+ */
+function layoutAvatars(
+  regions: Region[],
+  now: Date,
+): Array<{ region: Region; x: number; y: number; clusterIndex: number; clusterSize: number }> {
+  if (regions.length === 0) return [];
+
+  const CLUSTER_WINDOW_DEG = 14;
+  const R_BASE = 24; // inner radius (% from center)
+  const R_STEP = 7;  // how much further out each stacked sibling sits
+  const R_MAX = 34;  // never pass the hour-numeral ring
+
+  // 1. compute each region's preferred angle
+  const items = regions.map((region) => {
+    const hour = getRegionHour(region.timezone, now);
+    const minute = getRegionMinute(region.timezone, now);
+    // 0° = top (12 o'clock). Hours sweep clockwise.
+    const angleDeg = (((hour % 12) + minute / 60) * 30 - 90 + 360) % 360;
+    return { region, angleDeg };
+  });
+
+  // 2. sort by angle so adjacent items in the list are adjacent on the dial
+  items.sort((a, b) => a.angleDeg - b.angleDeg);
+
+  // 3. group neighbors within the cluster window
+  type Group = typeof items;
+  const groups: Group[] = [];
+  for (const it of items) {
+    const last = groups[groups.length - 1];
+    if (last && it.angleDeg - last[last.length - 1].angleDeg < CLUSTER_WINDOW_DEG) {
+      last.push(it);
+    } else {
+      groups.push([it]);
+    }
+  }
+  // Wrap: merge the last group with the first if they're close across midnight
+  if (groups.length > 1) {
+    const first = groups[0];
+    const last = groups[groups.length - 1];
+    const wrapGap = first[0].angleDeg + 360 - last[last.length - 1].angleDeg;
+    if (wrapGap < CLUSTER_WINDOW_DEG) {
+      groups[0] = [...last, ...first];
+      groups.pop();
+    }
+  }
+
+  // 4. place each cluster along its mean radial spoke
+  const placed: Array<{ region: Region; x: number; y: number; clusterIndex: number; clusterSize: number }> = [];
+  for (const group of groups) {
+    // mean angle, handling wrap-around (the merged wrap-cluster needs care)
+    let sum = 0;
+    let prev = group[0].angleDeg;
+    let acc = prev;
+    for (let i = 1; i < group.length; i++) {
+      let a = group[i].angleDeg;
+      // if this entry is more than 180 below prev, it wrapped — bump it up
+      while (a < prev - 180) a += 360;
+      acc = a;
+      sum += a - group[0].angleDeg;
+      prev = acc;
+    }
+    const meanAngle = group[0].angleDeg + sum / group.length;
+    const angleRad = (meanAngle * Math.PI) / 180;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    group.forEach((g, i) => {
+      const radius = Math.min(R_BASE + i * R_STEP, R_MAX);
+      placed.push({
+        region: g.region,
+        x: r(50 + radius * cos),
+        y: r(50 + radius * sin),
+        clusterIndex: i,
+        clusterSize: group.length,
+      });
+    });
+  }
+
+  return placed;
+}
 
 export const AnalogClock = memo(function AnalogClock({
   regions,
@@ -112,19 +206,10 @@ export const AnalogClock = memo(function AnalogClock({
   // Region positions only need minute precision — skip recomputation on second ticks
   const minuteKey = Math.floor(now.getTime() / 60000);
   const regionPositions = useMemo(() => {
-    return regions.map((region) => {
-      const hour = getRegionHour(region.timezone, now);
-      const minute = getRegionMinute(region.timezone, now);
-      const angleDeg = ((hour % 12) + minute / 60) * 30 - 90;
-      const angleRad = (angleDeg * Math.PI) / 180;
-      const radius = 28;
-      return {
-        region,
-        x: r(50 + radius * Math.cos(angleRad)),
-        y: r(50 + radius * Math.sin(angleRad)),
-        time: formatTime(region.timezone, now, is24h),
-      };
-    });
+    return layoutAvatars(regions, now).map((p) => ({
+      ...p,
+      time: formatTime(p.region.timezone, now, is24h),
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regions, minuteKey, is24h]);
 
@@ -135,39 +220,40 @@ export const AnalogClock = memo(function AnalogClock({
 
         {/* Hour hand — thick and tapered */}
         <line
-          x1="100" y1="100" x2="100" y2="44"
+          x1="100" y1="100" x2="100" y2="48"
           className="stroke-foreground"
-          strokeWidth="4.5"
+          strokeWidth="4"
           strokeLinecap="round"
           transform={`rotate(${r(hourAngle)}, 100, 100)`}
-          style={{ transition: "transform 0.3s ease" }}
+          style={{ transition: "transform 0.3s ease", willChange: "transform" }}
           suppressHydrationWarning
         />
 
         {/* Minute hand */}
         <line
-          x1="100" y1="100" x2="100" y2="28"
+          x1="100" y1="100" x2="100" y2="30"
           className="stroke-foreground"
-          strokeWidth="2.5"
+          strokeWidth="2.25"
           strokeLinecap="round"
           transform={`rotate(${r(minuteAngle)}, 100, 100)`}
-          style={{ transition: "transform 0.1s ease" }}
+          style={{ transition: "transform 0.1s ease", willChange: "transform" }}
           suppressHydrationWarning
         />
 
         {/* Second hand */}
         <line
-          x1="100" y1="112" x2="100" y2="24"
+          x1="100" y1="108" x2="100" y2="26"
           stroke="#ef4444"
-          strokeWidth="1.2"
+          strokeWidth="1"
           strokeLinecap="round"
           transform={`rotate(${secondAngle}, 100, 100)`}
+          style={{ willChange: "transform" }}
           suppressHydrationWarning
         />
 
         {/* Center cap */}
-        <circle cx="100" cy="100" r="4" className="fill-foreground" />
-        <circle cx="100" cy="100" r="2" fill="#ef4444" />
+        <circle cx="100" cy="100" r="3.5" className="fill-foreground" />
+        <circle cx="100" cy="100" r="1.5" fill="#ef4444" />
       </svg>
 
       {/* Region avatars positioned on the clock face */}
@@ -179,12 +265,13 @@ export const AnalogClock = memo(function AnalogClock({
           suppressHydrationWarning
         >
           <div
-            className="flex h-7 w-7 items-center justify-center rounded-full border-2
-                        border-muted-foreground/30 bg-muted/80 backdrop-blur-sm
-                        shadow-md transition-transform hover:scale-125 cursor-default"
+            className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full
+                        border border-foreground/15 bg-background/90
+                        shadow-[0_1px_3px_rgba(0,0,0,0.18)]
+                        transition-transform duration-150 hover:scale-110 cursor-default"
             title={`${region.city}: ${time}`}
           >
-            <span className="text-sm leading-none">
+            <span className="text-[12px] sm:text-sm leading-none">
               {region.flag}
             </span>
           </div>
