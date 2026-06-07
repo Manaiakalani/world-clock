@@ -31,8 +31,8 @@ const TICK_MARKS = Array.from({ length: 60 }, (_, i) => {
   const angleDeg = i * 6 - 90;
   const angleRad = (angleDeg * Math.PI) / 180;
   const isHour = i % 5 === 0;
-  const r1 = isHour ? 70 : 74;
-  const r2 = 78;
+  const r1 = isHour ? 78 : 82;
+  const r2 = 86;
   return {
     key: i,
     x1: r(100 + r1 * Math.cos(angleRad)),
@@ -47,7 +47,8 @@ const HOUR_NUMBERS = Array.from({ length: 12 }, (_, i) => {
   const num = i + 1;
   const angleDeg = num * 30 - 90;
   const angleRad = (angleDeg * Math.PI) / 180;
-  const rad = 86;
+  // Sit just inside the outer tick ring — outermost concentric band of info
+  const rad = 70;
   return {
     num,
     x: r(100 + rad * Math.cos(angleRad)),
@@ -61,14 +62,12 @@ const StaticClockFace = memo(function StaticClockFace() {
     <>
       <circle cx="100" cy="100" r="96" className="fill-background/60" />
       <circle cx="100" cy="100" r="96" fill="none" className="stroke-foreground/15" strokeWidth="1.5" />
-      {/* Faint inner guide where flag avatars sit — anchors the eye */}
-      <circle cx="100" cy="100" r="50" fill="none" className="stroke-foreground/8" strokeWidth="0.5" strokeDasharray="1 3" />
       {TICK_MARKS.map((t) => (
         <line
           key={t.key}
           x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-          className={t.isHour ? "stroke-foreground/85" : "stroke-muted-foreground/30"}
-          strokeWidth={t.isHour ? 1.75 : 0.6}
+          className={t.isHour ? "stroke-foreground/70" : "stroke-muted-foreground/25"}
+          strokeWidth={t.isHour ? 1.5 : 0.5}
           strokeLinecap="round"
         />
       ))}
@@ -78,7 +77,7 @@ const StaticClockFace = memo(function StaticClockFace() {
           x={h.x} y={h.y}
           textAnchor="middle"
           dominantBaseline="central"
-          className="fill-foreground/85 text-[11px] font-semibold"
+          className="fill-foreground/70 text-[8px] font-medium"
           style={{ fontFamily: "var(--font-sans)", letterSpacing: "-0.02em" }}
         >
           {h.num}
@@ -107,10 +106,14 @@ function layoutAvatars(
 ): Array<{ region: Region; x: number; y: number; clusterIndex: number; clusterSize: number }> {
   if (regions.length === 0) return [];
 
-  const CLUSTER_WINDOW_DEG = 14;
-  const R_BASE = 24; // inner radius (% from center)
-  const R_STEP = 7;  // how much further out each stacked sibling sits
-  const R_MAX = 34;  // never pass the hour-numeral ring
+  const CLUSTER_WINDOW_DEG = 18;
+  // Three clean concentric bands inside the numerals (SVG r=70 ≈ container 35%):
+  //   center cap → hands → R_BASE (22%) → R_BASE+STEP (30%) → numerals (35%).
+  // Stacked flags within a cluster sit on one spoke, separated by a full chip
+  // diameter so they always read as distinct beads — never kissing edges.
+  const R_BASE = 22;
+  const R_STEP = 8;
+  const R_MAX = 30;
 
   // 1. compute each region's preferred angle
   const items = regions.map((region) => {
@@ -220,9 +223,9 @@ export const AnalogClock = memo(function AnalogClock({
 
         {/* Hour hand — thick and tapered */}
         <line
-          x1="100" y1="100" x2="100" y2="48"
+          x1="100" y1="100" x2="100" y2="58"
           className="stroke-foreground"
-          strokeWidth="4"
+          strokeWidth="3.5"
           strokeLinecap="round"
           transform={`rotate(${r(hourAngle)}, 100, 100)`}
           style={{ transition: "transform 0.3s ease", willChange: "transform" }}
@@ -231,9 +234,9 @@ export const AnalogClock = memo(function AnalogClock({
 
         {/* Minute hand */}
         <line
-          x1="100" y1="100" x2="100" y2="30"
+          x1="100" y1="100" x2="100" y2="38"
           className="stroke-foreground"
-          strokeWidth="2.25"
+          strokeWidth="2"
           strokeLinecap="round"
           transform={`rotate(${r(minuteAngle)}, 100, 100)`}
           style={{ transition: "transform 0.1s ease", willChange: "transform" }}
@@ -242,9 +245,9 @@ export const AnalogClock = memo(function AnalogClock({
 
         {/* Second hand */}
         <line
-          x1="100" y1="108" x2="100" y2="26"
+          x1="100" y1="106" x2="100" y2="34"
           stroke="#ef4444"
-          strokeWidth="1"
+          strokeWidth="0.9"
           strokeLinecap="round"
           transform={`rotate(${secondAngle}, 100, 100)`}
           style={{ willChange: "transform" }}
@@ -289,7 +292,7 @@ export const AnalogClock = memo(function AnalogClock({
       ))}
 
       {/* Digital time display */}
-      <p className="mt-1 text-center font-mono text-sm sm:text-base font-bold tabular-nums tracking-widest" aria-live="polite" aria-atomic="true" suppressHydrationWarning>
+      <p className="mt-3 text-center font-mono text-sm sm:text-base font-bold tabular-nums tracking-widest" aria-live="polite" aria-atomic="true" suppressHydrationWarning>
         {formatTimeFull(localTimezone, now, is24h)}
         <span className="ml-1.5 text-[10px] sm:text-xs font-semibold text-muted-foreground/70 tracking-normal">
           {getTimezoneAbbr(localTimezone, now)}
