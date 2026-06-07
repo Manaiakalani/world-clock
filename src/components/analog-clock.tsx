@@ -31,8 +31,8 @@ const TICK_MARKS = Array.from({ length: 60 }, (_, i) => {
   const angleDeg = i * 6 - 90;
   const angleRad = (angleDeg * Math.PI) / 180;
   const isHour = i % 5 === 0;
-  const r1 = isHour ? 78 : 82;
-  const r2 = 86;
+  const r1 = isHour ? 82 : 85;
+  const r2 = 88;
   return {
     key: i,
     x1: r(100 + r1 * Math.cos(angleRad)),
@@ -47,8 +47,8 @@ const HOUR_NUMBERS = Array.from({ length: 12 }, (_, i) => {
   const num = i + 1;
   const angleDeg = num * 30 - 90;
   const angleRad = (angleDeg * Math.PI) / 180;
-  // Sit just inside the outer tick ring — outermost concentric band of info
-  const rad = 70;
+  // Just inside the tick ring — present enough to anchor a quick time read.
+  const rad = 74;
   return {
     num,
     x: r(100 + rad * Math.cos(angleRad)),
@@ -66,8 +66,8 @@ const StaticClockFace = memo(function StaticClockFace() {
         <line
           key={t.key}
           x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-          className={t.isHour ? "stroke-foreground/70" : "stroke-muted-foreground/25"}
-          strokeWidth={t.isHour ? 1.5 : 0.5}
+          className={t.isHour ? "stroke-foreground/80" : "stroke-muted-foreground/30"}
+          strokeWidth={t.isHour ? 1.75 : 0.5}
           strokeLinecap="round"
         />
       ))}
@@ -77,7 +77,7 @@ const StaticClockFace = memo(function StaticClockFace() {
           x={h.x} y={h.y}
           textAnchor="middle"
           dominantBaseline="central"
-          className="fill-foreground/70 text-[8px] font-medium"
+          className="fill-foreground/85 text-[11px] font-semibold"
           style={{ fontFamily: "var(--font-sans)", letterSpacing: "-0.02em" }}
         >
           {h.num}
@@ -107,13 +107,13 @@ function layoutAvatars(
   if (regions.length === 0) return [];
 
   const CLUSTER_WINDOW_DEG = 18;
-  // Three clean concentric bands inside the numerals (SVG r=70 ≈ container 35%):
-  //   center cap → hands → R_BASE (22%) → R_BASE+STEP (30%) → numerals (35%).
+  // Bands inside the numerals (which now sit at SVG r=74, ≈ container 37%):
+  //   center cap → hands → R_BASE (18%) → +R_STEP (26%) → +R_STEP (max 28%) → numerals.
   // Stacked flags within a cluster sit on one spoke, separated by a full chip
   // diameter so they always read as distinct beads — never kissing edges.
-  const R_BASE = 22;
+  const R_BASE = 18;
   const R_STEP = 8;
-  const R_MAX = 30;
+  const R_MAX = 28;
 
   // 1. compute each region's preferred angle
   const items = regions.map((region) => {
@@ -268,13 +268,13 @@ export const AnalogClock = memo(function AnalogClock({
           suppressHydrationWarning
         >
           <div
-            className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full
+            className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full
                         border border-foreground/15 bg-background/90
                         shadow-[0_1px_3px_rgba(0,0,0,0.18)]
                         transition-transform duration-150 hover:scale-110 cursor-default"
             title={`${region.city}: ${time}`}
           >
-            <span className="text-[12px] sm:text-sm leading-none">
+            <span className="text-[14px] sm:text-base leading-none">
               {region.flag}
             </span>
           </div>
