@@ -631,3 +631,43 @@ The design enforces these contracts:
   be instant.
 - **Don't introduce a third typeface.** Inter for chrome, JetBrains Mono
   for digits, full stop.
+
+## Places & the day/night dial (June 2026 update)
+
+### Places — multiple cities per timezone
+
+A *place* is a labeled point on Earth that resolves to an IANA timezone.
+Most places map 1:1 to a tz (e.g. `Europe/London`), but a place id can
+include a `#alias` suffix to ride on a shared tz with its own label,
+coordinates, and flag. Example: `America/Los_Angeles#us-redmond` shows
+Redmond, WA alongside Los Angeles using the same Pacific tz rules.
+
+Place ids are plain strings, so they pass through `localStorage`, URL
+share params, and existing tz utilities unchanged — `resolveTimezone()`
+strips the suffix before any IANA call. Custom labels and coords come
+from `PLACE_OVERRIDES` in `src/data/places.ts`.
+
+### Region card states
+
+Cards now have two states with a single transition:
+
+- **Collapsed (default):** the original compact row — flag, city,
+  meta line, time, offset. Information density is preserved.
+- **Active / expanded:** an iOS-Clock-inspired panel that adds a
+  larger time, a "Today / Tomorrow" pill, sunrise/sunset markers,
+  and a circular **day/night dial** centered between text columns.
+
+### The day/night dial
+
+`<RegionCardDial />` renders a 72px SVG ring representing 24 hours.
+Midnight sits at the top, hours advance clockwise. Sunrise→sunset is
+drawn as a bright arc, the night side recedes to a low-contrast arc.
+A sun (with rays) or crescent moon pip marks the current local hour
+and slides each minute via the existing `now` tick — no new timer.
+
+Sunrise / sunset come from Open-Meteo's daily fields (already cached
+per region). When weather is unavailable the dial falls back to a
+fixed 06:00 / 18:00 split so it always renders.
+
+The dial is intentionally text-free: it's a glanceable companion to
+the numeric time, not a replacement for it.

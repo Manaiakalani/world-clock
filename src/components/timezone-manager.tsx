@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ALL_TIMEZONES, CONTINENTS } from "@/data/timezone-data";
+import { ALL_TIMEZONES, CONTINENTS, type TimezoneEntry } from "@/data/timezone-data";
+import { ALL_PLACE_OVERRIDES, resolveTimezone } from "@/data/places";
 import { formatTime, getOffsetFromLocal, formatOffset } from "@/lib/timezone-utils";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
 import { Switch } from "@/components/ui/switch";
@@ -14,6 +15,13 @@ const TIMEZONE_PRESETS: Record<string, string[]> = {
   APAC: ["Asia/Tokyo", "Asia/Shanghai", "Asia/Calcutta", "Australia/Sydney"],
   Africa: ["Africa/Nairobi", "Africa/Lagos", "Africa/Cairo", "Africa/Johannesburg"],
 };
+
+/** Combined entry: a real tz or an aliased place override. */
+interface PlaceEntry extends TimezoneEntry {
+  /** Unique key for storage/toggling. Equals tz for real entries, or the alias id for places. */
+  placeId: string;
+  flagOverride?: string;
+}
 
 interface TimezoneManagerProps {
   now: Date;
@@ -37,29 +45,44 @@ export function TimezoneManager({
   const [search, setSearch] = useState("");
   const [expandedContinent, setExpandedContinent] = useState<string | null>(null);
 
+  // Combined list: real timezones + aliased place overrides
+  const allEntries: PlaceEntry[] = useMemo(() => {
+    const base: PlaceEntry[] = ALL_TIMEZONES.map((tz) => ({ ...tz, placeId: tz.timezone }));
+    const places: PlaceEntry[] = ALL_PLACE_OVERRIDES.map((p) => ({
+      timezone: resolveTimezone(p.id),
+      label: p.label,
+      continent: p.continent,
+      coordinates: p.coordinates,
+      placeId: p.id,
+      flagOverride: p.flag,
+    }));
+    return [...base, ...places];
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return ALL_TIMEZONES;
-    return ALL_TIMEZONES.filter(
-      (tz) =>
-        tz.label.toLowerCase().includes(q) ||
-        tz.timezone.toLowerCase().includes(q) ||
-        tz.continent.toLowerCase().includes(q)
+    if (!q) return allEntries;
+    return allEntries.filter(
+      (e) =>
+        e.label.toLowerCase().includes(q) ||
+        e.timezone.toLowerCase().includes(q) ||
+        e.continent.toLowerCase().includes(q) ||
+        e.placeId.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, allEntries]);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, typeof filtered>();
+    const map = new Map<string, PlaceEntry[]>();
     for (const continent of CONTINENTS) {
-      const items = filtered.filter((tz) => tz.continent === continent);
+      const items = filtered.filter((e) => e.continent === continent);
       if (items.length > 0) map.set(continent, items);
     }
     return map;
   }, [filtered]);
 
   const activeCount = useMemo(
-    () => ALL_TIMEZONES.filter((tz) => isActive(tz.timezone)).length,
-    [isActive]
+    () => allEntries.filter((e) => isActive(e.placeId)).length,
+    [isActive, allEntries]
   );
 
   return (
@@ -97,8 +120,8 @@ export function TimezoneManager({
           <button
             key={label}
             onClick={() => {
-              const current = ALL_TIMEZONES.filter((tz) => isActive(tz.timezone)).map(
-                (tz) => tz.timezone
+              const current = allEntries.filter((e) => isActive(e.placeId)).map(
+                (e) => e.placeId
               );
               const merged = Array.from(new Set([...current, ...tzs]));
               onSetTimezones(merged);
@@ -114,7 +137,7 @@ export function TimezoneManager({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {Array.from(grouped.entries()).map(([continent, timezones]) => {
           const isExpanded = expandedContinent === continent || search.length > 0;
-          const activeInGroup = timezones.filter((tz) => isActive(tz.timezone)).length;
+          const activeInGroup = timezones.filter((e) => isActive(e.placeId)).length;
 
           return (
             <div key={continent} className="mb-1">
@@ -137,22 +160,22 @@ export function TimezoneManager({
                   {timezones.map((tz) => {
                     const offset = getOffsetFromLocal(tz.timezone, now);
                     const time = formatTime(tz.timezone, now, is24h);
-                    const active = isActive(tz.timezone);
+                    const active = isActive(tz.placeId);
 
                     return (
                       <label
-                        key={tz.timezone}
+                        key={tz.placeId}
                         className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5
                                     transition-colors hover:bg-accent/50
                                     ${active ? "bg-accent/30" : ""}`}
                       >
                         <Switch
                           checked={active}
-                          onCheckedChange={() => onToggle(tz.timezone)}
+                          onCheckedChange={() => onToggle(tz.placeId)}
                           className="scale-75"
                         />
                         <span className="text-base leading-none shrink-0">
-                          {getFlagForTimezone(tz.timezone)}
+                          {tz.flagOverride ?? getFlagForTimezone(tz.timezone)}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate">{tz.label}</div>

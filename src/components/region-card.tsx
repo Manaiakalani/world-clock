@@ -19,6 +19,7 @@ import {
 } from "@/lib/timezone-utils";
 import { getGradientForHour, gradientToCSS } from "@/lib/sky-gradients";
 import { type WeatherData } from "@/lib/weather";
+import { RegionCardDial } from "@/components/region-card-dial";
 
 interface RegionCardProps {
   region: Region;
@@ -30,6 +31,22 @@ interface RegionCardProps {
   isLocal?: boolean;
   localTimezone?: string;
   devMode?: boolean;
+}
+
+/** Parse open-meteo's local ISO timestamp ("YYYY-MM-DDTHH:MM") into a fractional hour. */
+function localHourFromIso(iso: string | undefined): number | undefined {
+  if (!iso) return undefined;
+  const m = /T(\d{2}):(\d{2})/.exec(iso);
+  if (!m) return undefined;
+  return parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+}
+
+/** Relative-day pill text (Today / Tomorrow / Yesterday / +Nd). */
+function relativeDayLabel(diff: string | null): string {
+  if (!diff) return "Today";
+  if (diff === "+1d") return "Tomorrow";
+  if (diff === "-1d") return "Yesterday";
+  return diff;
 }
 
 export const RegionCard = memo(function RegionCard({ region, now, onClick, isActive, weather, is24h, isLocal, localTimezone, devMode }: RegionCardProps) {
@@ -46,6 +63,10 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
     () => getGradientForHour(hour + minute / 60),
     [hour, minute]
   );
+
+  const sunriseHour = useMemo(() => localHourFromIso(weather?.sunrise), [weather?.sunrise]);
+  const sunsetHour = useMemo(() => localHourFromIso(weather?.sunset), [weather?.sunset]);
+  const dialHour = hour + minute / 60;
 
   // DST transitions are stable within a day — only recompute when the date changes
   const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
@@ -79,9 +100,9 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
     <button
       onClick={onClick}
       aria-label={`${region.city}, ${region.flag} — ${time} ${offsetStr}`}
-      className={`region-card group relative w-full overflow-hidden rounded-lg border ${isLocal ? "border-white/25" : "border-white/10"} px-2.5 py-2 sm:px-3 sm:py-2.5 xl:py-2 2xl:px-3.5 2xl:py-3 text-left
+      className={`region-card group relative w-full overflow-hidden rounded-2xl border ${isLocal ? "border-white/25" : "border-white/10"} px-3 py-2.5 sm:px-3.5 sm:py-3 text-left
                   transition-[transform,box-shadow] duration-200
-                  active:scale-[0.97]
+                  active:scale-[0.98]
                   ${isLocal ? "ring-1 ring-white/25" : ""}
                   ${isActive ? "ring-2 ring-white/30 shadow-lg" : ""}`}
       style={{
@@ -90,13 +111,12 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
       }}
     >
       {/* Dark scrim for text readability across all sky gradients */}
-      <div className="absolute inset-0 bg-black/25 rounded-lg" />
+      <div className="absolute inset-0 bg-black/25 rounded-2xl" />
 
-      <div className="relative z-10 flex items-center gap-2" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
-        {/* Flag */}
+      {/* Collapsed row — always visible. Keeps the compact information density users know. */}
+      <div className="relative z-10 flex items-center gap-2.5" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
         <span className="text-lg leading-none shrink-0" style={{ textShadow: "none" }}>{region.flag}</span>
 
-        {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-[13px] sm:text-sm font-semibold leading-tight tracking-tight text-white">
@@ -130,7 +150,6 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
           </div>
         </div>
 
-        {/* Time */}
         <div className="text-right">
           <div className="font-mono text-[13px] sm:text-sm font-bold leading-tight tabular-nums text-white">
             {time}
@@ -142,28 +161,66 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
         </div>
       </div>
 
-      {/* Expanded details — always present for smooth animation */}
+      {/* Expanded panel — iOS-style: big time, central day/night dial, weather row */}
       <div
         className="region-card-expand relative z-10"
         data-expanded={isActive ? "true" : "false"}
       >
         <div className="overflow-hidden">
           {isActive && (
-            <div className="mt-2 pt-2 border-t border-white/15"
+            <div className="mt-3 pt-3 border-t border-white/15"
                  style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
-              <div className="flex items-center justify-between text-[11px] sm:text-xs text-white/80">
-                <span suppressHydrationWarning>{expandedDate}</span>
-                {weather && (
-                  <span className="font-medium">{weather.label}</span>
-                )}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white/90"
+                          style={{ textShadow: "none" }}>
+                      {relativeDayLabel(dayDiff)}
+                    </span>
+                    {isLocal && (
+                      <span className="inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white/90"
+                            style={{ textShadow: "none" }}>
+                        ↗ Local
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 text-[11px] sm:text-xs text-white/80" suppressHydrationWarning>
+                    {expandedDate}
+                  </div>
+                </div>
+
+                <RegionCardDial
+                  hour={dialHour}
+                  sunriseHour={sunriseHour}
+                  sunsetHour={sunsetHour}
+                  size={68}
+                  className="shrink-0"
+                />
+
+                <div className="text-right shrink-0">
+                  <div className="font-mono text-2xl sm:text-3xl font-bold leading-none tabular-nums text-white">
+                    {time}
+                  </div>
+                  <div className="mt-1 text-[11px] text-white/70 font-medium">
+                    {offsetStr}
+                    {dayDiff && <span className="ml-1 text-amber-300/90">· {dayDiff}</span>}
+                  </div>
+                </div>
               </div>
-              {sunriseStr && sunsetStr && (
-                <div className="mt-1.5 flex items-center gap-3 text-[11px] sm:text-xs text-white/80" suppressHydrationWarning>
-                  <span>🌅 {sunriseStr}</span>
-                  <span>🌇 {sunsetStr}</span>
+
+              {(sunriseStr || sunsetStr || weather) && (
+                <div className="mt-3 flex items-center justify-between gap-3 text-[11px] sm:text-xs text-white/85" suppressHydrationWarning>
+                  <div className="flex items-center gap-3">
+                    {sunriseStr && <span>🌅 {sunriseStr}</span>}
+                    {sunsetStr && <span>🌇 {sunsetStr}</span>}
+                  </div>
+                  {weather && (
+                    <span className="font-medium">{weather.label}</span>
+                  )}
                 </div>
               )}
-              <div className="mt-1 text-[10px] text-white/50 font-mono">
+
+              <div className="mt-2 text-[10px] text-white/50 font-mono">
                 {region.timezone}
               </div>
               {devInfo && (

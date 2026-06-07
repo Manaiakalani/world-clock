@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ALL_TIMEZONES, type TimezoneEntry } from "@/data/timezone-data";
+import { ALL_PLACE_OVERRIDES, resolveTimezone } from "@/data/places";
 import { resolveTimezoneQuery } from "@/data/timezone-aliases";
 import { formatTime } from "@/lib/timezone-utils";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
@@ -29,40 +30,62 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
   );
 
   interface SearchResult extends TimezoneEntry {
+    /** The place id used as the unique key for toggling/storage. Equals tz unless aliased. */
+    placeId: string;
+    /** Flag override (places carry their own flag). */
+    flagOverride?: string;
     aliasHint?: string; // e.g. "via EST"
   }
+
+  // Build a combined entry list once (real timezones + aliased place overrides).
+  const allEntries: SearchResult[] = useMemo(() => {
+    const base: SearchResult[] = ALL_TIMEZONES.map((tz) => ({
+      ...tz,
+      placeId: tz.timezone,
+    }));
+    const places: SearchResult[] = ALL_PLACE_OVERRIDES.map((p) => ({
+      timezone: resolveTimezone(p.id),
+      label: p.label,
+      continent: p.continent,
+      coordinates: p.coordinates,
+      placeId: p.id,
+      flagOverride: p.flag,
+    }));
+    return [...base, ...places];
+  }, []);
 
   const results: SearchResult[] = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) {
-      return ALL_TIMEZONES.filter((tz) => isActive(tz.timezone)).slice(0, 10);
+      return allEntries.filter((e) => isActive(e.placeId)).slice(0, 10);
     }
 
     // Direct name/timezone/continent matching
-    const directResults: SearchResult[] = ALL_TIMEZONES.filter(
-      (tz) =>
-        tz.label.toLowerCase().includes(q) ||
-        tz.timezone.toLowerCase().includes(q) ||
-        tz.continent.toLowerCase().includes(q)
+    const directResults: SearchResult[] = allEntries.filter(
+      (e) =>
+        e.label.toLowerCase().includes(q) ||
+        e.timezone.toLowerCase().includes(q) ||
+        e.continent.toLowerCase().includes(q) ||
+        e.placeId.toLowerCase().includes(q)
     ).slice(0, 10);
 
     // If direct matches are sparse, try alias resolution
     if (directResults.length < 3) {
       const aliasMatches = resolveTimezoneQuery(q);
-      const seen = new Set(directResults.map((r) => r.timezone));
+      const seen = new Set(directResults.map((r) => r.placeId));
 
       for (const match of aliasMatches) {
         if (seen.has(match.timezone)) continue;
         const entry = tzIndex.get(match.timezone);
         if (!entry) continue;
         seen.add(match.timezone);
-        directResults.push({ ...entry, aliasHint: `via ${match.matchedVia}` });
+        directResults.push({ ...entry, placeId: match.timezone, aliasHint: `via ${match.matchedVia}` });
         if (directResults.length >= 10) break;
       }
     }
 
     return directResults;
-  }, [search, isActive, tzIndex]);
+  }, [search, isActive, tzIndex, allEntries]);
 
   // Focus input on mount
   useEffect(() => {
@@ -95,7 +118,7 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
       } else if (e.key === "Enter" && results[selectedIndex]) {
         e.preventDefault();
-        onToggle(results[selectedIndex].timezone);
+        onToggle(results[selectedIndex].placeId);
       } else if (e.key === "Escape") {
         e.preventDefault();
         onClose();
@@ -142,16 +165,16 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
             </div>
           ) : (
             results.map((tz, index) => {
-              const active = isActive(tz.timezone);
+              const active = isActive(tz.placeId);
               return (
                 <button
-                  key={tz.timezone}
-                  onClick={() => onToggle(tz.timezone)}
+                  key={tz.placeId}
+                  onClick={() => onToggle(tz.placeId)}
                   className={`flex w-full items-center gap-3 px-4 py-2 text-left transition-colors
                     ${index === selectedIndex ? "bg-accent" : "hover:bg-accent/50"}
                     ${active ? "opacity-100" : "opacity-60"}`}
                 >
-                  <span className="text-base leading-none shrink-0">{getFlagForTimezone(tz.timezone)}</span>
+                  <span className="text-base leading-none shrink-0">{tz.flagOverride ?? getFlagForTimezone(tz.timezone)}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{tz.label}</div>
                     <div className="text-[10px] text-muted-foreground truncate">

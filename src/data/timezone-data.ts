@@ -430,6 +430,7 @@ export const CONTINENTS = [...new Set(ALL_TIMEZONES.map(t => t.continent))].sort
 
 export const DEFAULT_TIMEZONES = [
   "America/Los_Angeles",
+  "America/Los_Angeles#us-redmond",
   "America/New_York",
   "Africa/Nairobi",
   "Europe/London",
