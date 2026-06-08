@@ -268,13 +268,21 @@ nextjs-portal {
   display: none !important;
 }
 
-/* Header globe icon animations — paused by default, play on hover */
+/* Header globe icon animations — paused by default, play on hover.
+   Skipped entirely for users who prefer reduced motion. */
 .globe-anim {
   animation-play-state: paused;
+  transform-origin: center;
+  transform-box: fill-box;
 }
 @media (hover: hover) and (pointer: fine) {
   .group:hover .globe-anim {
     animation-play-state: running;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .globe-anim {
+    animation: none !important;
   }
 }
 
