@@ -24,7 +24,8 @@ import { RegionCardDial } from "@/components/region-card-dial";
 interface RegionCardProps {
   region: Region;
   now: Date;
-  onClick?: () => void;
+  /** Called with the region id; stable across renders so React.memo isn't defeated. */
+  onClick?: (id: string) => void;
   isActive?: boolean;
   weather?: WeatherData | null;
   is24h?: boolean;
@@ -98,7 +99,7 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
 
   return (
     <button
-      onClick={onClick}
+      onClick={onClick ? () => onClick(region.id) : undefined}
       aria-label={`${region.city}, ${region.flag} — ${time} ${offsetStr}`}
       className={`region-card group relative w-full overflow-hidden rounded-2xl border ${isLocal ? "border-white/25" : "border-white/10"} px-3 py-2.5 sm:px-3.5 sm:py-3 text-left
                   transition-[transform,box-shadow] duration-200

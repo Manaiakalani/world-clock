@@ -24,6 +24,10 @@ interface AnalogClockProps {
   localTimezone: string;
   is24h?: boolean;
   className?: string;
+  /** Region id of the active card — highlighted on the dial. */
+  activeRegionId?: string | null;
+  /** Click handler — proxied through to the matching region. */
+  onRegionClick?: (id: string) => void;
 }
 
 // Pre-computed static geometry — never changes, rendered once
@@ -88,32 +92,26 @@ const StaticClockFace = memo(function StaticClockFace() {
 });
 
 /**
- * Lay out region avatars on the clock with cluster-aware radial stacking.
+ * Lay out region avatars on the clock as one chunky chip per cluster.
  *
- * 1. Compute each region's angular position from its local hour+minute.
- * 2. Group neighbors that fall within `clusterWindowDeg` of each other.
- * 3. Place each cluster along a single radial spoke at the cluster's mean
- *    angle, stacking members from inner to outer radius — like beads on a
- *    string. This matches the iOS Clock convention and prevents the
- *    flag-on-flag overlap that compromises the dial when many cities sit
- *    in the same hour bucket (e.g. Sydney + Tokyo near 5–7).
+ * Production world-clock UIs (iOS Clock and the React community repos
+ * surveyed for this project) never overlay multiple labels on a single
+ * shared analog face — they give each city its own mini-dial. We keep the
+ * shared-dial concept as a feature but compress same-hour cities into a
+ * single chip with an overflow badge ("+2") so one clear flag stands in
+ * for the whole cluster. Clicking a card adds a ring to the matching chip
+ * so the dial echoes the selection.
  *
  * Coordinates are in container percentage space (50,50 = center).
  */
 function layoutAvatars(
   regions: Region[],
   now: Date,
-): Array<{ region: Region; x: number; y: number; clusterIndex: number; clusterSize: number }> {
+): Array<{ regions: Region[]; x: number; y: number }> {
   if (regions.length === 0) return [];
 
-  const CLUSTER_WINDOW_DEG = 18;
-  // Bands inside the numerals (which now sit at SVG r=74, ≈ container 37%):
-  //   center cap → hands → R_BASE (18%) → +R_STEP (26%) → +R_STEP (max 28%) → numerals.
-  // Stacked flags within a cluster sit on one spoke, separated by a full chip
-  // diameter so they always read as distinct beads — never kissing edges.
-  const R_BASE = 18;
-  const R_STEP = 8;
-  const R_MAX = 28;
+  const CLUSTER_WINDOW_DEG = 14;
+  const RADIUS = 25; // single ring just inside the numerals (SVG r=74 ≈ 37%)
 
   // 1. compute each region's preferred angle
   const items = regions.map((region) => {
@@ -149,38 +147,24 @@ function layoutAvatars(
     }
   }
 
-  // 4. place each cluster along its mean radial spoke
-  const placed: Array<{ region: Region; x: number; y: number; clusterIndex: number; clusterSize: number }> = [];
-  for (const group of groups) {
-    // mean angle, handling wrap-around (the merged wrap-cluster needs care)
-    let sum = 0;
+  // 4. place each cluster as one chip at the cluster's mean angle
+  return groups.map((group) => {
     let prev = group[0].angleDeg;
-    let acc = prev;
+    let sum = 0;
     for (let i = 1; i < group.length; i++) {
       let a = group[i].angleDeg;
-      // if this entry is more than 180 below prev, it wrapped — bump it up
       while (a < prev - 180) a += 360;
-      acc = a;
       sum += a - group[0].angleDeg;
-      prev = acc;
+      prev = a;
     }
     const meanAngle = group[0].angleDeg + sum / group.length;
     const angleRad = (meanAngle * Math.PI) / 180;
-    const cos = Math.cos(angleRad);
-    const sin = Math.sin(angleRad);
-    group.forEach((g, i) => {
-      const radius = Math.min(R_BASE + i * R_STEP, R_MAX);
-      placed.push({
-        region: g.region,
-        x: r(50 + radius * cos),
-        y: r(50 + radius * sin),
-        clusterIndex: i,
-        clusterSize: group.length,
-      });
-    });
-  }
-
-  return placed;
+    return {
+      regions: group.map((g) => g.region),
+      x: r(50 + RADIUS * Math.cos(angleRad)),
+      y: r(50 + RADIUS * Math.sin(angleRad)),
+    };
+  });
 }
 
 export const AnalogClock = memo(function AnalogClock({
@@ -189,6 +173,8 @@ export const AnalogClock = memo(function AnalogClock({
   localTimezone,
   is24h,
   className,
+  activeRegionId,
+  onRegionClick,
 }: AnalogClockProps) {
   // Self-subscribing second-precision clock — isolates 1s ticks to this component only
   const rawNow = useCurrentTime(1000);
@@ -208,13 +194,11 @@ export const AnalogClock = memo(function AnalogClock({
 
   // Region positions only need minute precision — skip recomputation on second ticks
   const minuteKey = Math.floor(now.getTime() / 60000);
-  const regionPositions = useMemo(() => {
-    return layoutAvatars(regions, now).map((p) => ({
-      ...p,
-      time: formatTime(p.region.timezone, now, is24h),
-    }));
+  const clusters = useMemo(
+    () => layoutAvatars(regions, now),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regions, minuteKey, is24h]);
+    [regions, minuteKey],
+  );
 
   return (
     <div className={`relative ${className ?? ""}`} suppressHydrationWarning>
@@ -259,37 +243,67 @@ export const AnalogClock = memo(function AnalogClock({
         <circle cx="100" cy="100" r="1.5" fill="#ef4444" />
       </svg>
 
-      {/* Region avatars positioned on the clock face */}
-      {regionPositions.map(({ region, x, y, time }) => (
-        <div
-          key={region.id}
-          className="absolute -translate-x-1/2 -translate-y-1/2 group"
-          style={{ left: `${x}%`, top: `${y}%` }}
-          suppressHydrationWarning
-        >
-          <div
-            className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full
-                        border border-foreground/15 bg-background/90
-                        shadow-[0_1px_3px_rgba(0,0,0,0.18)]
-                        transition-transform duration-150 hover:scale-110 cursor-default"
-            title={`${region.city}: ${time}`}
+      {/* Region avatars — one chip per cluster with an overflow badge */}
+      {clusters.map(({ regions: cluster, x, y }) => {
+        // Pick a representative: the active region if it's in this cluster,
+        // otherwise the first one (already sorted by angle).
+        const activeMatch = activeRegionId ? cluster.find((r) => r.id === activeRegionId) : undefined;
+        const lead = activeMatch ?? cluster[0];
+        const overflow = cluster.length - 1;
+        const isActiveCluster = !!activeMatch;
+        const labels = cluster.map((r) => r.city).join(" · ");
+
+        return (
+          <button
+            key={lead.id}
+            type="button"
+            onClick={onRegionClick ? () => onRegionClick(lead.id) : undefined}
+            className="absolute -translate-x-1/2 -translate-y-1/2 group focus:outline-none"
+            style={{ left: `${x}%`, top: `${y}%` }}
+            aria-label={labels}
+            title={labels}
+            suppressHydrationWarning
           >
-            <span className="text-[14px] sm:text-base leading-none">
-              {region.flag}
-            </span>
-          </div>
-          {/* Tooltip on hover */}
-          <div
-            className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1
-                        whitespace-nowrap rounded-md bg-popover px-2 py-1 text-[10px] font-medium
-                        text-popover-foreground shadow-lg opacity-0 transition-opacity
-                        group-hover:opacity-100 border border-border"
-          >
-            <div className="font-semibold">{region.city}</div>
-            <div className="text-muted-foreground">{time}</div>
-          </div>
-        </div>
-      ))}
+            <div
+              className={`relative flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center
+                          rounded-full bg-background/95 shadow-[0_1px_4px_rgba(0,0,0,0.25)]
+                          transition-transform duration-150 group-hover:scale-110
+                          ${isActiveCluster
+                            ? "ring-2 ring-foreground/70 border border-transparent"
+                            : "border border-foreground/20"}`}
+            >
+              <span className="text-[15px] sm:text-base leading-none">{lead.flag}</span>
+              {overflow > 0 && (
+                <span
+                  className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center
+                              rounded-full bg-foreground px-1 text-[8px] font-bold leading-none text-background
+                              shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
+                  aria-hidden="true"
+                >
+                  +{overflow}
+                </span>
+              )}
+            </div>
+            {/* Tooltip on hover — lists all cities in the cluster */}
+            <div
+              className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5
+                          whitespace-nowrap rounded-md bg-popover px-2 py-1 text-[10px] font-medium
+                          text-popover-foreground shadow-lg opacity-0 transition-opacity
+                          group-hover:opacity-100 border border-border z-10"
+            >
+              {cluster.map((r) => (
+                <div key={r.id} className="flex items-center gap-1.5">
+                  <span>{r.flag}</span>
+                  <span className="font-semibold">{r.city}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {formatTime(r.timezone, now, is24h)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </button>
+        );
+      })}
 
       {/* Digital time display */}
       <p className="mt-3 text-center font-mono text-sm sm:text-base font-bold tabular-nums tracking-widest" aria-live="polite" aria-atomic="true" suppressHydrationWarning>

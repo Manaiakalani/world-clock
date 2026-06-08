@@ -378,6 +378,8 @@ export default function WorldClockPage() {
                       timeOffset={timeOffset}
                       localTimezone={localTimezone}
                       is24h={is24h}
+                      activeRegionId={activeRegionId}
+                      onRegionClick={handleRegionClick}
                       className="aspect-square"
                     />
                   </div>
