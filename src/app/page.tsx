@@ -266,7 +266,7 @@ export default function WorldClockPage() {
               /* Main view: clock + region cards */
               <>
                 {/* Panel header */}
-                <div className="flex shrink-0 items-center justify-between">
+                <div className="flex shrink-0 items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5">
                     <h2 className="text-lg font-semibold tracking-tight">Regions</h2>
                     {devMode && (
@@ -274,8 +274,8 @@ export default function WorldClockPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <div className="flex items-center gap-1 text-muted-foreground">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="h-3.5 w-3.5 hidden sm:block" />
                       <Switch
                         checked={showClock}
@@ -285,7 +285,7 @@ export default function WorldClockPage() {
                       <List className="h-3.5 w-3.5 hidden sm:block" />
                     </div>
                     {/* Desktop / tablet icon row — hidden on phones in favor of the bottom action bar */}
-                    <div className="hidden sm:flex items-center gap-1">
+                    <div className="hidden sm:flex items-center gap-1.5 border-l border-border/60 pl-3">
                     <button
                       onClick={toggleTimeFormat}
                       className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border
@@ -378,6 +378,8 @@ export default function WorldClockPage() {
                       timeOffset={timeOffset}
                       localTimezone={localTimezone}
                       is24h={is24h}
+                      activeRegionId={activeRegionId}
+                      onRegionClick={handleRegionClick}
                       className="aspect-square"
                     />
                   </div>

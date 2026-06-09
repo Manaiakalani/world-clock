@@ -202,17 +202,24 @@ a:focus-visible {
   transition: none !important;
 }
 
-/* Smooth card expand/collapse */
-.region-card-expand {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 250ms var(--ease-out);
+/* Smooth card expand — opacity + translate is GPU-only (compositor),
+   far cheaper than animating grid-template-rows or max-height which
+   trigger full layout/paint on every frame. The card's height changes
+   instantly on click; the panel content fades and slides in. */
+.region-card-expand[data-expanded="false"] {
+  display: none;
 }
-.region-card-expand[data-expanded="true"] {
-  grid-template-rows: 1fr;
+.region-card-expand[data-expanded="true"] > div {
+  animation: cardPanelIn 220ms var(--ease-out) both;
 }
-.region-card-expand > div {
-  min-height: 0;
+@keyframes cardPanelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .region-card-expand[data-expanded="true"] > div {
+    animation: none;
+  }
 }
 
 /* Weather loading shimmer — subtler than pulse */
@@ -241,18 +248,18 @@ a:focus-visible {
   animation: menuPopIn 180ms var(--ease-out) both;
 }
 
-/* Touch device hover safety */
+/* Touch device hover safety — keep hover affordance subtle and
+   compositor-only (no transform → no layer-thrash with the active scale). */
 @media (hover: hover) and (pointer: fine) {
   .region-card:hover {
-    transform: scale(1.01);
+    filter: brightness(1.04);
   }
 }
 
-/* Skip rendering offscreen region cards. ~70px intrinsic-size matches the
-   typical card height so layout doesn't jump as cards scroll into view. */
+/* Region cards stay fully rendered — at ~10 cards content-visibility costs
+   more than it saves and conflicts with the dynamic expanded height. */
 .region-card {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 64px;
+  contain: layout paint;
 }
 /* Hide Next.js dev indicator */
 [data-nextjs-dialog-overlay],
@@ -261,13 +268,21 @@ nextjs-portal {
   display: none !important;
 }
 
-/* Header globe icon animations — paused by default, play on hover */
+/* Header globe icon animations — paused by default, play on hover.
+   Skipped entirely for users who prefer reduced motion. */
 .globe-anim {
   animation-play-state: paused;
+  transform-origin: center;
+  transform-box: fill-box;
 }
 @media (hover: hover) and (pointer: fine) {
   .group:hover .globe-anim {
     animation-play-state: running;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .globe-anim {
+    animation: none !important;
   }
 }
 

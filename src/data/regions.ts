@@ -1,4 +1,5 @@
 import { ALL_TIMEZONES, type TimezoneEntry } from "@/data/timezone-data";
+import { getPlaceOverride, resolveTimezone } from "@/data/places";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
 import { getRegionHour, getRegionMinute, getRegionTime } from "@/lib/timezone-utils";
 import { getGradientForHour } from "@/lib/sky-gradients";
@@ -16,9 +17,11 @@ function getUtcOffset(timezone: string, now: Date): number {
 }
 
 export interface Region {
+  /** Unique place id (may equal tz or be an aliased 'tz#place' string). */
   id: string;
   name: string;
   city: string;
+  /** Resolved IANA timezone for time/date math. */
   timezone: string;
   coordinates: [number, number]; // [lat, lon]
   color: [number, number, number]; // RGB 0-1 for COBE marker
@@ -44,20 +47,28 @@ function skyColorForTimezone(timezone: string, now: Date): [number, number, numb
   return hexToRgb(gradient.via);
 }
 
-export function regionsFromTimezones(timezoneIds: string[], now?: Date, customOrder?: boolean): Region[] {
+export function regionsFromTimezones(placeIds: string[], now?: Date, customOrder?: boolean): Region[] {
   const currentTime = now ?? new Date();
-  const regions = timezoneIds
-    .map((tzId) => {
-      const entry = TIMEZONE_INDEX.get(tzId);
+  const regions = placeIds
+    .map((placeId) => {
+      const tz = resolveTimezone(placeId);
+      const override = getPlaceOverride(placeId);
+      const entry = TIMEZONE_INDEX.get(tz);
       if (!entry) return null;
+
+      const label = override?.label ?? entry.label;
+      const continent = override?.continent ?? entry.continent;
+      const coordinates = (override?.coordinates ?? entry.coordinates) as [number, number];
+      const flag = override?.flag ?? getFlagForTimezone(tz);
+
       return {
-        id: tzId.replace(/\//g, "-").toLowerCase(),
-        name: entry.continent,
-        city: entry.label,
-        timezone: entry.timezone,
-        coordinates: entry.coordinates as [number, number],
-        color: skyColorForTimezone(tzId, currentTime),
-        flag: getFlagForTimezone(tzId),
+        id: placeId.replace(/[\/#]/g, "-").toLowerCase(),
+        name: continent,
+        city: label,
+        timezone: tz,
+        coordinates,
+        color: skyColorForTimezone(tz, currentTime),
+        flag,
       };
     })
     .filter((r): r is Region => r !== null);

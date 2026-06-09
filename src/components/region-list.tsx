@@ -106,7 +106,7 @@ export const RegionList = memo(function RegionList({
               <RegionCard
                 region={region}
                 now={now}
-                onClick={() => onRegionClick(region.id)}
+                onClick={onRegionClick}
                 isActive={activeRegionId === region.id}
                 weather={weather?.[region.id]}
                 is24h={is24h}

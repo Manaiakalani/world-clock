@@ -18,6 +18,7 @@
 | 🌍 **3D Globe** | Interactive COBE globe with sky-colored markers and arc connections |
 | 🕐 **Analog Clock** | SVG clock with country flag avatars positioned at each timezone's hour |
 | 🌅 **Sky Gradients** | Region cards use dynamic gradients matching time of day (dawn → day → dusk → night) |
+| 🌓 **Day / Night Dial** | Active cards reveal a 24h SVG dial with a sun/moon pip on the sunrise→sunset arc |
 | 🌤️ **Live Weather** | Temperature, conditions, and emoji from Open-Meteo (free, no API key) |
 | 📅 **Meeting Planner** | Visual grid showing overlapping working hours across all timezones (⌘M) |
 | 🔍 **Quick Search** | Cmd+K palette to instantly add/remove timezones with keyboard navigation |
@@ -134,6 +135,7 @@ world-clock/
 │   │   ├── analog-clock.tsx        # SVG clock with flag avatars
 │   │   ├── aurora-background.tsx   # WebGL atmospheric scattering
 │   │   ├── region-card.tsx         # Sky-gradient timezone card
+│   │   ├── region-card-dial.tsx    # 24h day/night dial (shown when card expands)
 │   │   ├── region-list.tsx         # Sorted card list
 │   │   ├── meeting-planner.tsx     # Working hours overlap grid
 │   │   ├── quick-search.tsx        # ⌘K search palette
@@ -143,7 +145,7 @@ world-clock/
 │   │   └── ui/                     # shadcn/ui primitives
 │   ├── hooks/                      # Custom React hooks
 │   ├── lib/                        # Utilities, sky gradients, weather
-│   └── data/                       # Timezone database, regions
+│   └── data/                       # Timezone database, regions, places (multi-city-per-tz aliases)
 ├── tests/                          # Playwright responsive tests
 ├── public/                         # PWA manifest, robots.txt, security.txt
 ├── Dockerfile                      # Multi-stage production build
