@@ -35,6 +35,9 @@ export const RegionList = memo(function RegionList({
   const dragIndexRef = useRef<number | null>(null);
   const overIndexRef = useRef<number | null>(null);
   const dragNodeRef = useRef<HTMLDivElement | null>(null);
+  // Mirror dragIndex in state for the drop-indicator render — refs can't be
+  // read during render. Only the drag handlers consult the ref version.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   // State only for visual drop indicator
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -47,6 +50,7 @@ export const RegionList = memo(function RegionList({
     requestAnimationFrame(() => {
       if (dragNodeRef.current) dragNodeRef.current.style.opacity = "0.5";
       setIsDragging(true);
+      setDragIndex(index);
     });
   }, []);
 
@@ -62,6 +66,7 @@ export const RegionList = memo(function RegionList({
     dragNodeRef.current = null;
     setDropTarget(null);
     setIsDragging(false);
+    setDragIndex(null);
   }, [onReorder]);
 
   const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
@@ -81,7 +86,7 @@ export const RegionList = memo(function RegionList({
         <div
           key={region.id}
           className={`region-card-enter ${
-            dropTarget === index && isDragging && dragIndexRef.current !== index
+            dropTarget === index && isDragging && dragIndex !== index
               ? "border-t-2 border-primary/50"
               : ""
           }`}

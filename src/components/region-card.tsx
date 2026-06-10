@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useId, useMemo } from "react";
 import { Region } from "@/data/regions";
 import {
   formatTime,
@@ -51,6 +51,7 @@ function relativeDayLabel(diff: string | null): string {
 }
 
 export const RegionCard = memo(function RegionCard({ region, now, onClick, isActive, weather, is24h, isLocal, localTimezone, devMode }: RegionCardProps) {
+  const panelId = useId();
   const time = formatTime(region.timezone, now, is24h);
   const hour = getRegionHour(region.timezone, now);
   const minute = getRegionMinute(region.timezone, now);
@@ -101,6 +102,8 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
     <button
       onClick={onClick ? () => onClick(region.id) : undefined}
       aria-label={`${region.city}, ${region.flag} — ${time} ${offsetStr}`}
+      aria-expanded={!!isActive}
+      aria-controls={panelId}
       className={`region-card group relative w-full overflow-hidden rounded-2xl border ${isLocal ? "border-white/25" : "border-white/10"} px-3 py-2.5 sm:px-3.5 sm:py-3 text-left
                   transition-[transform,box-shadow] duration-200
                   active:scale-[0.98]
@@ -164,6 +167,7 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
 
       {/* Expanded panel — iOS-style: big time, central day/night dial, weather row */}
       <div
+        id={panelId}
         className="region-card-expand relative z-10"
         data-expanded={isActive ? "true" : "false"}
       >

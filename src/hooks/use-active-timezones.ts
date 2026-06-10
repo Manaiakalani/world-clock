@@ -1,10 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { DEFAULT_TIMEZONES } from "@/data/timezone-data";
+import { useLocalStorageState } from "./use-local-storage-state";
 
 const STORAGE_KEY = "world-clock-active-timezones";
 const URL_PARAM = "zones";
+
+function parseTimezones(raw: string): string[] {
+  const parsed = JSON.parse(raw);
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    return parsed.filter((t): t is string => typeof t === "string");
+  }
+  return DEFAULT_TIMEZONES;
+}
 
 function readFromUrlParams(): string[] | null {
   if (typeof window === "undefined") return null;
@@ -19,58 +28,53 @@ function readFromUrlParams(): string[] | null {
   return null;
 }
 
-function readFromStorage(): string[] {
-  if (typeof window === "undefined") return DEFAULT_TIMEZONES;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {}
-  return DEFAULT_TIMEZONES;
-}
-
-function writeToStorage(timezones: string[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(timezones));
-  } catch {}
+// useSyncExternalStore-based hydration flag. Returns false on the server and
+// during the initial client render (so SSR + hydration match), then flips to
+// true once React has hydrated.
+const NEVER_CHANGES = () => () => {};
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    NEVER_CHANGES,
+    () => true,
+    () => false,
+  );
 }
 
 export function useActiveTimezones() {
-  const [activeTimezones, setActiveTimezones] = useState<string[]>(DEFAULT_TIMEZONES);
-  const [loaded, setLoaded] = useState(false);
+  const [activeTimezones, setActiveTimezones] = useLocalStorageState<string[]>(
+    STORAGE_KEY,
+    DEFAULT_TIMEZONES,
+    parseTimezones,
+  );
+  const loaded = useHydrated();
 
+  // URL params take precedence on first mount — write them to storage and
+  // the store subscription propagates the new value into state without an
+  // additional setState call.
   useEffect(() => {
     const fromUrl = readFromUrlParams();
-    if (fromUrl) {
-      setActiveTimezones(fromUrl);
-      writeToStorage(fromUrl);
-    } else {
-      setActiveTimezones(readFromStorage());
-    }
-    setLoaded(true);
+    if (fromUrl) setActiveTimezones(fromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const toggle = useCallback((tz: string) => {
-    setActiveTimezones((prev) => {
-      const next = prev.includes(tz)
-        ? prev.filter((t) => t !== tz)
-        : [...prev, tz];
-      writeToStorage(next);
-      return next;
-    });
-  }, []);
+  const toggle = useCallback(
+    (tz: string) => {
+      setActiveTimezones((prev) =>
+        prev.includes(tz) ? prev.filter((t) => t !== tz) : [...prev, tz],
+      );
+    },
+    [setActiveTimezones],
+  );
 
   const isActive = useCallback(
     (tz: string) => activeTimezones.includes(tz),
-    [activeTimezones]
+    [activeTimezones],
   );
 
-  const setTimezones = useCallback((tzs: string[]) => {
-    setActiveTimezones(tzs);
-    writeToStorage(tzs);
-  }, []);
+  const setTimezones = useCallback(
+    (tzs: string[]) => setActiveTimezones(tzs),
+    [setActiveTimezones],
+  );
 
   const getShareUrl = useCallback(() => {
     const url = new URL(window.location.href);

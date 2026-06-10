@@ -1,32 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useLocalStorageState } from "./use-local-storage-state";
 
 const STORAGE_KEY = "world-clock-dev-mode";
 
-export function useDevMode(): { devMode: boolean; toggleDevMode: () => void } {
-  const [devMode, setDevMode] = useState(false);
+const parseBool = (raw: string) => raw === "true";
+const serializeBool = (v: boolean) => String(v);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "true") setDevMode(true);
-    } catch {
-      // localStorage unavailable
-    }
-  }, []);
+export function useDevMode(): { devMode: boolean; toggleDevMode: () => void } {
+  const [devMode, setDevMode] = useLocalStorageState(
+    STORAGE_KEY,
+    false,
+    parseBool,
+    serializeBool,
+  );
 
   const toggleDevMode = useCallback(() => {
-    setDevMode((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(STORAGE_KEY, String(next));
-      } catch {
-        // localStorage unavailable
-      }
-      return next;
-    });
-  }, []);
+    setDevMode((prev) => !prev);
+  }, [setDevMode]);
 
   return { devMode, toggleDevMode };
 }

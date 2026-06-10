@@ -1,38 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useLocalStorageState } from "./use-local-storage-state";
 
 const STORAGE_KEY = "world-clock-custom-order";
 
-function readOrder(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeOrder(enabled: boolean) {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(enabled));
-  } catch {}
-}
+const parseBool = (raw: string) => raw === "true";
+const serializeBool = (v: boolean) => String(v);
 
 export function useCustomOrder() {
-  const [customOrder, setCustomOrder] = useState(false);
-
-  useEffect(() => {
-    setCustomOrder(readOrder());
-  }, []);
+  const [customOrder, setCustomOrder] = useLocalStorageState(
+    STORAGE_KEY,
+    false,
+    parseBool,
+    serializeBool,
+  );
 
   const toggleCustomOrder = useCallback(() => {
-    setCustomOrder((prev) => {
-      const next = !prev;
-      writeOrder(next);
-      return next;
-    });
-  }, []);
+    setCustomOrder((prev) => !prev);
+  }, [setCustomOrder]);
 
   return { customOrder, toggleCustomOrder };
 }

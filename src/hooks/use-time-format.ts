@@ -1,28 +1,27 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
+import { useLocalStorageState } from "./use-local-storage-state";
 
 type TimeFormat = "12h" | "24h";
 
 const STORAGE_KEY = "world-clock-time-format";
 
-export function useTimeFormat() {
-  const [format, setFormat] = useState<TimeFormat>("12h");
+const parseFormat = (raw: string): TimeFormat =>
+  raw === "24h" ? "24h" : "12h";
+const serializeFormat = (v: TimeFormat) => v;
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "12h" || stored === "24h") {
-      setFormat(stored);
-    }
-  }, []);
+export function useTimeFormat() {
+  const [format, setFormat] = useLocalStorageState<TimeFormat>(
+    STORAGE_KEY,
+    "12h",
+    parseFormat,
+    serializeFormat,
+  );
 
   const toggle = useCallback(() => {
-    setFormat((prev) => {
-      const next = prev === "12h" ? "24h" : "12h";
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    });
-  }, []);
+    setFormat((prev) => (prev === "12h" ? "24h" : "12h"));
+  }, [setFormat]);
 
   return { format, toggle, is24h: format === "24h" };
 }
