@@ -18,6 +18,13 @@ function formatOffset(h: number): string {
   return `${sign}${h}h`;
 }
 
+function formatValueText(h: number): string {
+  if (h === 0) return "Now";
+  const abs = Math.abs(h);
+  const unit = abs === 1 ? "hour" : "hours";
+  return h > 0 ? `${abs} ${unit} from now` : `${abs} ${unit} ago`;
+}
+
 export function TimeSlider({
   offsetHours,
   onOffsetChange,
@@ -157,6 +164,12 @@ export function TimeSlider({
 
         {/* Thumb */}
         <div
+          role="slider"
+          aria-label="Time offset from now"
+          aria-valuemin={MIN_OFFSET}
+          aria-valuemax={MAX_OFFSET}
+          aria-valuenow={offsetHours}
+          aria-valuetext={formatValueText(offsetHours)}
           className={cn(
             "slider-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 rounded-full border-2 border-primary bg-background shadow-md",
             "transition-[box-shadow,transform] duration-200",

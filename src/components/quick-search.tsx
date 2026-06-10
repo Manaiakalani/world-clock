@@ -22,6 +22,10 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Track the previous results array to reset selection when the list changes
+  // without paying for a useEffect → setState cascade. This is React's
+  // recommended "adjust state during render" pattern for derived state.
+  const [prevResults, setPrevResults] = useState<unknown>(null);
 
   // Index ALL_TIMEZONES by IANA id for O(1) lookups when resolving aliases
   const tzIndex = useMemo(
@@ -87,15 +91,15 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
     return directResults;
   }, [search, isActive, tzIndex, allEntries]);
 
+  if (prevResults !== results) {
+    setPrevResults(results);
+    setSelectedIndex(0);
+  }
+
   // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  // Reset selection when results change
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [results]);
 
   // Scroll selected item into view
   useEffect(() => {

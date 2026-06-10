@@ -258,7 +258,7 @@ export const AnalogClock = memo(function AnalogClock({
             key={lead.id}
             type="button"
             onClick={onRegionClick ? () => onRegionClick(lead.id) : undefined}
-            className="absolute -translate-x-1/2 -translate-y-1/2 group focus:outline-none"
+            className={`absolute -translate-x-1/2 -translate-y-1/2 group focus:outline-none ${onRegionClick ? "cursor-pointer" : "cursor-default"}`}
             style={{ left: `${x}%`, top: `${y}%` }}
             aria-label={labels}
             title={labels}
