@@ -8,7 +8,8 @@ interface LocationInput {
   coordinates: [number, number]; // [lat, lon]
 }
 
-const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes — background refresh cadence
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes — stale-while-revalidate window
 const STORAGE_KEY = "world-clock-weather-cache";
 const STORAGE_UNIT_KEY = "world-clock-temp-unit";
 
@@ -17,13 +18,39 @@ interface CachedWeather {
   timestamp: number;
 }
 
+// Defensive shape check — bail on anything that doesn't look like our schema
+// so an old/garbled cache from a previous build can't poison render state.
+function isValidCachedWeather(value: unknown): value is CachedWeather {
+  if (!value || typeof value !== "object") return false;
+  const v = value as { data?: unknown; timestamp?: unknown };
+  if (typeof v.timestamp !== "number" || !v.data || typeof v.data !== "object") return false;
+  for (const entry of Object.values(v.data as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object") return false;
+    const e = entry as Partial<WeatherData>;
+    if (
+      typeof e.temperatureC !== "number" ||
+      typeof e.temperatureF !== "number" ||
+      typeof e.weatherCode !== "number" ||
+      typeof e.isDay !== "boolean" ||
+      typeof e.emoji !== "string" ||
+      typeof e.label !== "string"
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function loadCache(): CachedWeather | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as CachedWeather;
-    if (Date.now() - parsed.timestamp > REFRESH_INTERVAL) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isValidCachedWeather(parsed)) return null;
+    // SWR semantics: anything within the TTL is served immediately while we
+    // refetch in the background. Past the TTL we drop it entirely.
+    if (Date.now() - parsed.timestamp > CACHE_TTL) return null;
     return parsed;
   } catch {
     return null;
