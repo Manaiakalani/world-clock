@@ -429,7 +429,7 @@ export default function WorldClockPage() {
         <nav
           aria-label="Primary actions"
           className="sm:hidden fixed inset-x-0 bottom-0 z-30 border-t border-border
-                     bg-background/70 backdrop-blur-md
+                     bg-background/85
                      pb-[env(safe-area-inset-bottom)]"
         >
           <div className="flex items-center justify-around px-2 py-1.5">
@@ -502,7 +502,7 @@ export default function WorldClockPage() {
               <div
                 role="menu"
                 className="overflow-menu-enter absolute right-2 bottom-[calc(100%+8px)] z-20 w-44 rounded-xl border border-border
-                           bg-popover/95 backdrop-blur-md shadow-lg overflow-hidden"
+                           bg-popover/95 shadow-lg overflow-hidden"
                 style={{ transformOrigin: "bottom right" }}
               >
                 <button

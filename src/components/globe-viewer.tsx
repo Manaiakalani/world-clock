@@ -219,7 +219,7 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
         <div
           key={region.id}
           className="pointer-events-none absolute text-xs font-medium whitespace-nowrap
-                     rounded-md bg-black/70 px-2 py-1 text-white backdrop-blur-sm
+                     rounded-md bg-black/85 px-2 py-1 text-white
                      transition-opacity duration-300"
           style={{
             positionAnchor: `--cobe-${region.id}` as string,

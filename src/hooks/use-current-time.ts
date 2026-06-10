@@ -1,14 +1,4 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
-export function useCurrentTime(intervalMs: number = 1000): Date {
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-
-  return now;
-}
+// Backward-compatible re-export. Prefer importing `useSecond` from "@/hooks/use-clock".
+export { useSecond as useCurrentTime } from "./use-clock";

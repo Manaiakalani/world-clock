@@ -102,7 +102,7 @@ export function TimeSlider({
       tabIndex={0}
       onKeyDown={handleKeyDown}
       className={cn(
-        "group flex items-center gap-3 rounded-xl border border-border bg-background/50 backdrop-blur-md px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "group flex items-center gap-3 rounded-xl border border-border bg-background/85 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
     >
