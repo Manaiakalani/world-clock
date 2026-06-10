@@ -269,7 +269,7 @@ export const AnalogClock = memo(function AnalogClock({
                           rounded-full bg-background/95 shadow-[0_1px_4px_rgba(0,0,0,0.25)]
                           transition-transform duration-150 group-hover:scale-110
                           ${isActiveCluster
-                            ? "ring-2 ring-foreground/70 border border-transparent"
+                            ? "ring-2 ring-ring border border-transparent"
                             : "border border-foreground/20"}`}
             >
               <span className="text-[15px] sm:text-base leading-none">{lead.flag}</span>
