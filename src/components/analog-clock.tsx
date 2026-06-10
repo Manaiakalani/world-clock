@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, memo } from "react";
+import { useMemo, memo, useEffect, useRef } from "react";
 import { Region } from "@/data/regions";
-import { useCurrentTime } from "@/hooks/use-current-time";
+import { useMinute } from "@/hooks/use-clock";
 import {
   getRegionHour,
   getRegionMinute,
-  getRegionSecond,
   formatTime,
   formatTimeFull,
   getTimezoneAbbr,
@@ -176,8 +175,10 @@ export const AnalogClock = memo(function AnalogClock({
   activeRegionId,
   onRegionClick,
 }: AnalogClockProps) {
-  // Self-subscribing second-precision clock — isolates 1s ticks to this component only
-  const rawNow = useCurrentTime(1000);
+  // Subscribe only to minute precision — hour/minute hands and cluster layout
+  // never need sub-minute updates. The smooth second hand below mutates the
+  // DOM directly via rAF so it never triggers React reconciliation.
+  const rawNow = useMinute();
   const now = useMemo(
     () => (timeOffset === 0 ? rawNow : new Date(rawNow.getTime() + timeOffset * 3600000)),
     [rawNow, timeOffset],
@@ -185,19 +186,61 @@ export const AnalogClock = memo(function AnalogClock({
 
   const localHour = getRegionHour(localTimezone, now);
   const localMinute = getRegionMinute(localTimezone, now);
-  const localSecond = getRegionSecond(localTimezone, now);
 
-  // Clock hand angles
-  const secondAngle = localSecond * 6;
-  const minuteAngle = localMinute * 6 + localSecond * 0.1;
+  // Clock hand angles. The second hand starts at the minute-start position;
+  // the rAF effect below sweeps it from there.
+  const minuteAngle = localMinute * 6;
   const hourAngle = (localHour % 12) * 30 + localMinute * 0.5;
 
-  // Region positions only need minute precision — skip recomputation on second ticks
-  const minuteKey = Math.floor(now.getTime() / 60000);
+  // Direct-DOM second hand: avoids re-rendering the whole clock 60×/min.
+  const secondHandRef = useRef<SVGLineElement | null>(null);
+  useEffect(() => {
+    const el = secondHandRef.current;
+    if (!el) return;
+
+    // Respect prefers-reduced-motion: snap to current second, no animation loop.
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) {
+      const s = Math.floor(((Date.now() + timeOffset * 3600000) / 1000) % 60);
+      el.setAttribute("transform", `rotate(${s * 6}, 100, 100)`);
+      return;
+    }
+
+    let raf = 0;
+    const tick = () => {
+      const t = Date.now() + timeOffset * 3600000;
+      const seconds = (t / 1000) % 60;
+      el.setAttribute("transform", `rotate(${seconds * 6}, 100, 100)`);
+      raf = requestAnimationFrame(tick);
+    };
+    const start = () => {
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    const stop = () => {
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+    const onVisibility = () => {
+      if (document.hidden) stop();
+      else start();
+    };
+
+    if (typeof document === "undefined" || !document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [timeOffset]);
+
+  // Region positions only need minute precision — re-runs only when minute or regions change.
   const clusters = useMemo(
     () => layoutAvatars(regions, now),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [regions, minuteKey],
+    [regions, now],
   );
 
   return (
@@ -227,13 +270,13 @@ export const AnalogClock = memo(function AnalogClock({
           suppressHydrationWarning
         />
 
-        {/* Second hand */}
+        {/* Second hand — rotated via direct DOM mutation from a rAF loop (no React re-renders) */}
         <line
+          ref={secondHandRef}
           x1="100" y1="106" x2="100" y2="34"
           stroke="#ef4444"
           strokeWidth="0.9"
           strokeLinecap="round"
-          transform={`rotate(${secondAngle}, 100, 100)`}
           style={{ willChange: "transform" }}
           suppressHydrationWarning
         />

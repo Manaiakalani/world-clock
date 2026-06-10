@@ -132,7 +132,7 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm${instant ? " no-animate" : ""}`}
+        className={`fixed inset-0 z-50 bg-black/55${instant ? " no-animate" : ""}`}
         onClick={onClose}
       />
 

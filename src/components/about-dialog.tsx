@@ -12,7 +12,7 @@ export function AboutDialog({ onClose, instant }: AboutDialogProps) {
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm${instant ? " no-animate" : ""}`}
+        className={`fixed inset-0 z-50 bg-black/50${instant ? " no-animate" : ""}`}
         onClick={onClose}
       />
 
