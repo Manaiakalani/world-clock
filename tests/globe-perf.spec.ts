@@ -4,7 +4,7 @@ test.describe("Globe performance", () => {
   test("clicking a card does not cause globe re-initialization", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(3000);
 
     // Start collecting logs AFTER init is done
@@ -36,7 +36,7 @@ test.describe("Globe performance", () => {
 
   test("globe maintains frame rate during card clicks", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(3000);
 
     // Measure frame count over 2 seconds before click
@@ -83,7 +83,7 @@ test.describe("Globe performance", () => {
 
   test("no excessive re-renders on timer tick", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(3000);
 
     const logs: string[] = [];
