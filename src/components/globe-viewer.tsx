@@ -173,6 +173,7 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
       if (handleVisibility) document.removeEventListener("visibilitychange", handleVisibility);
       if (globe) globe.destroy();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dark]);
 
   return (

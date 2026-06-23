@@ -127,7 +127,6 @@ test.describe("Accessibility audit", () => {
       const issues: { html: string }[] = [];
       els.forEach((el) => {
         const ariaLabel = el.getAttribute("aria-label") ?? "";
-        const id = el.getAttribute("id") ?? "";
         const labelledBy = el.getAttribute("aria-labelledby") ?? "";
         // Check if wrapped in a <label>
         const parentLabel = el.closest("label");

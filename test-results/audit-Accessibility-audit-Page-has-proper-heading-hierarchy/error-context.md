@@ -1,0 +1,204 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]: UM
+        - generic: UniFi Monitor
+        - button "Expand sidebar":
+          - img
+      - generic [ref=e7]:
+        - button "Search ⌘K" [ref=e8]:
+          - img [ref=e9]
+          - generic:
+            - text: Search
+            - generic [ref=e12]: ⌘K
+        - generic [ref=e13]:
+          - heading "Search" [level=2] [ref=e14]
+          - paragraph [ref=e15]: Search devices and clients
+        - button "1 Notifications" [ref=e16]:
+          - generic [ref=e17]:
+            - img [ref=e18]
+            - generic [ref=e21]: "1"
+          - generic: Notifications
+      - navigation [ref=e23]:
+        - link "Overview" [ref=e24] [cursor=pointer]:
+          - /url: /
+          - img [ref=e25]
+          - generic: Overview
+        - link "Devices" [ref=e30] [cursor=pointer]:
+          - /url: /devices
+          - img [ref=e31]
+          - generic: Devices
+        - link "Clients" [ref=e35] [cursor=pointer]:
+          - /url: /clients
+          - img [ref=e36]
+          - generic: Clients
+        - link "Analytics" [ref=e41] [cursor=pointer]:
+          - /url: /analytics
+          - img [ref=e42]
+          - generic: Analytics
+        - link "Topology" [ref=e44] [cursor=pointer]:
+          - /url: /topology
+          - img [ref=e45]
+          - generic: Topology
+        - link "Security" [ref=e50] [cursor=pointer]:
+          - /url: /security
+          - img [ref=e51]
+          - generic: Security
+        - link "Reports" [ref=e53] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e54]
+          - generic: Reports
+        - link "Settings" [ref=e57] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e58]
+          - generic: Settings
+      - button "Switch to light mode" [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+    - main [ref=e69]:
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - heading "Overview" [level=1] [ref=e73]
+            - paragraph [ref=e74]: WiFi access point monitoring
+          - generic [ref=e75]:
+            - generic [ref=e79]: Updated just now
+            - generic [ref=e80]:
+              - button "↑ 0 B/s" [ref=e83]:
+                - generic [ref=e84]: ↑
+                - text: 0 B/s
+              - button "↓ 0 B/s" [ref=e85]:
+                - generic [ref=e86]: ↓
+                - text: 0 B/s
+            - group [ref=e87]:
+              - button "1h" [ref=e88]
+              - button "6h" [ref=e89]
+              - button "24h" [pressed] [ref=e90]
+              - button "7d" [ref=e91]
+              - button "30d" [ref=e92]
+        - generic [ref=e93]:
+          - link "Access Points 0" [ref=e94] [cursor=pointer]:
+            - /url: /devices
+            - generic [ref=e95]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 📡
+                - generic [ref=e99]: Access Points
+              - paragraph [ref=e101]: "0"
+          - link "Connected Clients 0" [ref=e102] [cursor=pointer]:
+            - /url: /clients
+            - generic [ref=e103]:
+              - generic [ref=e105]:
+                - generic [ref=e106]: 💻
+                - generic [ref=e107]: Connected Clients
+              - paragraph [ref=e109]: "0"
+          - link "Networks —" [ref=e110] [cursor=pointer]:
+            - /url: /analytics
+            - generic [ref=e111]:
+              - generic [ref=e113]:
+                - generic [ref=e114]: 🌐
+                - generic [ref=e115]: Networks
+              - paragraph [ref=e117]: —
+          - link "Subsystems 4/5 OK" [ref=e118] [cursor=pointer]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: ✅
+              - generic [ref=e122]: Subsystems
+              - generic [ref=e123]: ›
+            - paragraph [ref=e125]: 4/5 OK
+        - generic [ref=e126]:
+          - heading "Site Health" [level=2] [ref=e127]
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - generic [ref=e131]:
+                - generic [ref=e132]:
+                  - img [ref=e133]
+                  - generic [ref=e136]: wan
+                - generic [ref=e137]: ok
+              - generic [ref=e139]:
+                - generic [ref=e140]:
+                  - text: Score
+                  - generic [ref=e141]: 100%
+                - generic [ref=e142]:
+                  - text: Latency
+                  - generic [ref=e143]: 2ms
+            - generic [ref=e144]:
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - img [ref=e148]
+                  - generic [ref=e153]: INTERNET
+                - generic [ref=e154]: ok
+              - generic [ref=e156]:
+                - generic [ref=e157]:
+                  - text: Score
+                  - generic [ref=e158]: 100%
+                - generic [ref=e159]:
+                  - text: Latency
+                  - generic [ref=e160]: 2ms
+            - generic [ref=e161]:
+              - generic [ref=e163]:
+                - generic [ref=e164]:
+                  - img [ref=e165]
+                  - generic [ref=e169]: wlan
+                - generic [ref=e170]: ok
+              - generic [ref=e172]:
+                - generic [ref=e173]:
+                  - text: Score
+                  - generic [ref=e174]: 99%
+                - generic [ref=e175]: Users 50
+                - generic [ref=e176]: APs 3
+            - generic [ref=e177]:
+              - generic [ref=e179]:
+                - generic [ref=e180]:
+                  - img [ref=e181]
+                  - generic [ref=e184]: lan
+                - generic [ref=e185]: ok
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - text: Score
+                  - generic [ref=e189]: 100%
+                - generic [ref=e190]: Users 12
+            - generic [ref=e191]:
+              - generic [ref=e193]:
+                - generic [ref=e194]:
+                  - img [ref=e195]
+                  - generic [ref=e197]: vpn
+                - generic [ref=e198]: idle
+              - paragraph [ref=e200]: No active VPN
+        - generic [ref=e202]:
+          - generic [ref=e204]:
+            - img [ref=e205]
+            - text: Internet Latency
+          - generic [ref=e208]:
+            - paragraph [ref=e209]: 2ms
+            - generic [ref=e210]:
+              - generic [ref=e211]:
+                - term [ref=e212]: Min
+                - definition [ref=e213]: 2ms
+              - generic [ref=e214]:
+                - term [ref=e215]: Avg
+                - definition [ref=e216]: 2ms
+              - generic [ref=e217]:
+                - term [ref=e218]: p95
+                - definition [ref=e219]: 2ms
+        - separator [ref=e220]
+        - generic [ref=e221]:
+          - generic [ref=e222]:
+            - generic [ref=e224]: Throughput
+            - generic [ref=e228]:
+              - generic [ref=e230]:
+                - generic [ref=e231]: Download
+                - generic [ref=e233]: Upload
+              - application [ref=e235]
+          - generic [ref=e241]:
+            - generic [ref=e243]: Connected Clients
+            - generic [ref=e247]:
+              - generic [ref=e250]: Connected Clients
+              - application [ref=e252]
+        - heading "WLAN Configuration" [level=2] [ref=e259]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e265] [cursor=pointer]:
+    - img [ref=e266]
+  - alert [ref=e269]
+```
