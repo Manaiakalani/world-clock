@@ -442,7 +442,8 @@ test.describe("Fit & finish audit", () => {
     expect(enterClasses).toBeGreaterThan(0);
   });
 
-  test("Screenshot — both themes", { timeout: 120_000 }, async ({ page }) => {
+  test("Screenshot — both themes", async ({ page }) => {
+    test.setTimeout(120_000);
     for (const vp of viewports) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto("/", { waitUntil: "domcontentloaded" });
