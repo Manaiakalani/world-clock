@@ -3,6 +3,7 @@
 import { useRef, useEffect, memo } from "react";
 import type { Globe } from "cobe";
 import { type Region, generateArcs } from "@/data/regions";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 
 interface GlobeViewerProps {
   regions: Region[];
@@ -24,6 +25,11 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
   regionsRef.current = regions;
   const arcsRef = useRef(generateArcs(regions));
   arcsRef.current = generateArcs(regions);
+  // Read through a ref so toggling the OS setting doesn't tear down and rebuild
+  // the globe — the animation loop just stops advancing phi on its own.
+  const reducedMotion = usePrefersReducedMotion();
+  const reducedMotionRef = useRef(reducedMotion);
+  reducedMotionRef.current = reducedMotion;
 
   // Focus on a region — only updates the target phi ref, no globe recreation
   useEffect(() => {
@@ -115,11 +121,17 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
             const diff = targetPhiRef.current - phiRef.current;
             const normalizedDiff =
               ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
-            phiRef.current += normalizedDiff * 0.08;
-            if (Math.abs(normalizedDiff) < 0.01) {
+            if (reducedMotionRef.current) {
+              // Jump straight to the target instead of easing toward it.
+              phiRef.current = targetPhiRef.current;
               targetPhiRef.current = null;
+            } else {
+              phiRef.current += normalizedDiff * 0.08;
+              if (Math.abs(normalizedDiff) < 0.01) {
+                targetPhiRef.current = null;
+              }
             }
-          } else {
+          } else if (!reducedMotionRef.current) {
             phiRef.current += 0.003;
           }
         }

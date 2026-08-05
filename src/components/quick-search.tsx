@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useId } from "react";
 import { ALL_TIMEZONES, type TimezoneEntry } from "@/data/timezone-data";
 import { ALL_PLACE_OVERRIDES, resolveTimezone } from "@/data/places";
 import { resolveTimezoneQuery } from "@/data/timezone-aliases";
 import { formatTime } from "@/lib/timezone-utils";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
+import { useModalDialog } from "@/hooks/use-modal-dialog";
 import { Search, X } from "lucide-react";
 
 interface QuickSearchProps {
@@ -22,6 +23,11 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const optionId = useId();
+  // Focus trap + focus restore. autoFocus is off because the effect below puts
+  // focus on the search input specifically rather than the first focusable node.
+  const dialogRef = useModalDialog<HTMLDivElement>(onClose, { autoFocus: false });
   // Track the previous results array to reset selection when the list changes
   // without paying for a useEffect → setState cascade. This is React's
   // recommended "adjust state during render" pattern for derived state.
@@ -123,10 +129,8 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
       } else if (e.key === "Enter" && results[selectedIndex]) {
         e.preventDefault();
         onToggle(results[selectedIndex].placeId);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
       }
+      // Escape is handled by useModalDialog, which also restores focus.
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -138,16 +142,30 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
       <div
         className={`fixed inset-0 z-50 bg-black/55${instant ? " no-animate" : ""}`}
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Dialog */}
-      <div className={`fixed inset-x-0 top-[15%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden${instant ? " no-animate" : ""}`}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search timezones"
+        tabIndex={-1}
+        className={`fixed inset-x-0 top-[15%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden${instant ? " no-animate" : ""}`}
+      >
         {/* Search input */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls={listId}
+            aria-activedescendant={results.length > 0 ? `${optionId}-${selectedIndex}` : undefined}
+            aria-autocomplete="list"
+            aria-label="Search timezones"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search timezones..."
@@ -155,14 +173,21 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
           />
           <button
             onClick={onClose}
-            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+            aria-label="Close search"
+            className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="max-h-[300px] overflow-y-auto py-1">
+        <div
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          aria-label="Timezone results"
+          className="max-h-[300px] overflow-y-auto py-1"
+        >
           {results.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               No timezones found
@@ -173,6 +198,10 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
               return (
                 <button
                   key={tz.placeId}
+                  id={`${optionId}-${index}`}
+                  role="option"
+                  aria-selected={index === selectedIndex}
+                  tabIndex={-1}
                   onClick={() => onToggle(tz.placeId)}
                   className={`flex w-full items-center gap-3 px-4 py-2 text-left transition-colors
                     ${index === selectedIndex ? "bg-accent" : "hover:bg-accent/50"}

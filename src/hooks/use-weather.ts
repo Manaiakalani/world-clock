@@ -10,6 +10,7 @@ interface LocationInput {
 
 const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes — background refresh cadence
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes — stale-while-revalidate window
+const STAGGER_MS = 60; // per-request spacing so we don't burst Open-Meteo's rate limit
 const STORAGE_KEY = "world-clock-weather-cache";
 const STORAGE_UNIT_KEY = "world-clock-temp-unit";
 
@@ -102,25 +103,44 @@ export function useWeather(locations: LocationInput[]) {
     if (fetchingRef.current || locations.length === 0) return;
     fetchingRef.current = true;
 
-    // Fetch all in parallel with small stagger to avoid rate-limiting
-    const results: Record<string, WeatherData> = {};
-    const batches: Promise<void>[] = locations.map(async (loc) => {
-      const data = await fetchWeather(loc.coordinates[0], loc.coordinates[1], signal);
-      if (data) results[loc.id] = data;
-    });
-
     try {
-      await Promise.all(batches);
-    } catch (e: unknown) {
-      if (e instanceof DOMException && e.name === "AbortError") {
-        fetchingRef.current = false;
-        return;
-      }
+      // Stagger the requests so a large timezone list doesn't fire N simultaneous
+      // requests at Open-Meteo's free tier and trip its rate limiter.
+      const results: Record<string, WeatherData> = {};
+      await Promise.all(
+        locations.map(async (loc, index) => {
+          if (index > 0) {
+            await new Promise((r) => setTimeout(r, index * STAGGER_MS));
+          }
+          if (signal?.aborted) return;
+          const data = await fetchWeather(loc.coordinates[0], loc.coordinates[1], signal);
+          if (data) results[loc.id] = data;
+        })
+      );
+
+      // fetchWeather swallows every error (including aborts) and returns null, so a
+      // cancelled or failed run yields an empty/partial map. Committing that verbatim
+      // would blank the UI and overwrite the cache with nothing, so bail on abort and
+      // otherwise merge — a location that failed this round keeps its last good value.
+      if (signal?.aborted) return;
+      if (Object.keys(results).length === 0) return;
+
+      // Keep only the locations this run was actually about, so removing a city
+      // drops its reading instead of leaving it in state and the cache forever.
+      const wanted = new Set(locations.map((loc) => loc.id));
+      setWeather((prev) => {
+        const merged: Record<string, WeatherData> = {};
+        for (const [id, value] of Object.entries(prev)) {
+          if (wanted.has(id)) merged[id] = value;
+        }
+        Object.assign(merged, results);
+        saveCache(merged);
+        return merged;
+      });
+      setLoading(false);
+    } finally {
+      fetchingRef.current = false;
     }
-    setWeather(results);
-    saveCache(results);
-    setLoading(false);
-    fetchingRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationsKey]);
 
@@ -155,10 +175,15 @@ export function useWeather(locations: LocationInput[]) {
     };
   }, [fetchAll]);
 
-  // Periodic refresh
+  // Periodic refresh — owns an AbortController so in-flight background requests
+  // are cancelled on unmount rather than resolving into a dead component.
   useEffect(() => {
-    intervalRef.current = setInterval(fetchAll, REFRESH_INTERVAL);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    const controller = new AbortController();
+    intervalRef.current = setInterval(() => fetchAll(controller.signal), REFRESH_INTERVAL);
+    return () => {
+      controller.abort();
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [fetchAll]);
 
   return { weather, loading, unit, toggleUnit };

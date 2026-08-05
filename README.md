@@ -33,7 +33,7 @@
 - 📱 **Responsive** — mobile, tablet (with globe), and desktop layouts
 - ⌨️ **Keyboard shortcuts** — ⌘K search, ⌘, settings, ⌘M meeting planner, Esc close
 - ♿ **Accessible** — focus rings, skip-to-content, aria-live clock, screen reader labels
-- 📲 **PWA** — installable as a native app on mobile and desktop
+- 📲 **Installable** — web app manifest with icons, theme colour and standalone display (no offline service worker)
 - 🔒 **Privacy-first** — all data in localStorage, no cookies, no tracking, no accounts
 
 ---
@@ -80,7 +80,7 @@ cd world-clock
 docker compose up -d
 ```
 
-Available at [http://localhost:3100](http://localhost:3100).
+Available at [http://localhost:3009](http://localhost:3009).
 
 ### Production Build
 
@@ -97,8 +97,12 @@ npm run start
 
 ```bash
 docker build -t world-clock .
-docker run -d -p 3100:3000 --name world-clock world-clock
+docker run -d -p 3009:3009 --name world-clock world-clock
 ```
+
+The image listens on port 3009 (`ENV PORT=3009`). `docker-compose.yml` publishes
+`${PORT:-3009}:3009`, so set `PORT` in the environment to publish a different
+host port.
 
 ### Docker Compose
 
@@ -127,7 +131,7 @@ docker compose down             # stop
 world-clock/
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx              # Root layout, fonts, PWA, viewport
+│   │   ├── layout.tsx              # Root layout, fonts, manifest, viewport
 │   │   ├── page.tsx                # Main orchestrator — all hooks + UI
 │   │   └── globals.css             # Tailwind + animations + themes
 │   ├── components/
@@ -140,14 +144,17 @@ world-clock/
 │   │   ├── meeting-planner.tsx     # Working hours overlap grid
 │   │   ├── quick-search.tsx        # ⌘K search palette
 │   │   ├── timezone-manager.tsx    # Full timezone manager with presets
+│   │   ├── time-slider.tsx         # Time-travel scrubber
 │   │   ├── header.tsx              # Animated globe icon + date
 │   │   ├── about-dialog.tsx        # About, privacy, shortcuts
+│   │   ├── error-boundary.tsx      # Client-side render error fallback
+│   │   ├── providers.tsx           # Theme + app-level providers
 │   │   └── ui/                     # shadcn/ui primitives
-│   ├── hooks/                      # Custom React hooks
-│   ├── lib/                        # Utilities, sky gradients, weather
-│   └── data/                       # Timezone database, regions, places (multi-city-per-tz aliases)
-├── tests/                          # Playwright responsive tests
-├── public/                         # PWA manifest, robots.txt, security.txt
+│   ├── hooks/                      # Clock, weather, storage, modal + motion hooks
+│   ├── lib/                        # Time math, sky gradients, flags, weather client
+│   └── data/                       # Timezone database, aliases, regions (multi-city-per-tz)
+├── tests/                          # Playwright responsive + audit tests
+├── public/                         # Web app manifest, robots.txt, security.txt
 ├── Dockerfile                      # Multi-stage production build
 ├── docker-compose.yml              # One-command deployment
 └── playwright.config.ts            # Test configuration

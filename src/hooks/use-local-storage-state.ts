@@ -18,6 +18,24 @@ type Parser<T> = (raw: string) => T;
 
 const listeners = new Map<string, Set<() => void>>();
 
+/**
+ * Last-write-wins fallback for when localStorage is unavailable (Safari private
+ * mode, quota exceeded, storage disabled). Without it a failed write would still
+ * notify subscribers, they'd re-read the *old* persisted value, and the control
+ * would silently snap back — making toggles look broken.
+ */
+const memoryStore = new Map<string, string>();
+
+function readRaw(key: string): string | null {
+  if (memoryStore.has(key)) return memoryStore.get(key)!;
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 function subscribe(key: string, fn: () => void): () => void {
   let set = listeners.get(key);
   if (!set) {
@@ -55,14 +73,7 @@ export function useLocalStorageState<T>(
   parse: Parser<T> = JSON.parse as Parser<T>,
   serialize: Serializer<T> = JSON.stringify as Serializer<T>,
 ): [T, (value: T | ((prev: T) => T)) => void] {
-  const getSnapshot = useCallback((): string | null => {
-    if (typeof window === "undefined") return null;
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  }, [key]);
+  const getSnapshot = useCallback((): string | null => readRaw(key), [key]);
 
   // getServerSnapshot returns a stable sentinel so SSR + first client render
   // match. We map both to defaultValue below.
@@ -100,11 +111,15 @@ export function useLocalStorageState<T>(
         typeof next === "function"
           ? (next as (prev: T) => T)(current)
           : next;
+      const serialized = serialize(resolved);
       try {
-        localStorage.setItem(key, serialize(resolved));
+        localStorage.setItem(key, serialized);
+        // localStorage is authoritative again — drop any stale memory shadow.
+        memoryStore.delete(key);
       } catch {
-        // localStorage unavailable — still notify in-memory subscribers so
-        // the UI reflects the intended state for this session.
+        // Storage unavailable or over quota. Keep the value in memory so the
+        // change survives for this session instead of snapping back on re-read.
+        memoryStore.set(key, serialized);
       }
       notify(key);
     },

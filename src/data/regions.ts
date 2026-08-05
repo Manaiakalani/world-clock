@@ -1,7 +1,7 @@
 import { ALL_TIMEZONES, type TimezoneEntry } from "@/data/timezone-data";
 import { getPlaceOverride, resolveTimezone } from "@/data/places";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
-import { getRegionHour, getRegionMinute, getRegionTime } from "@/lib/timezone-utils";
+import { getRegionHour, getRegionMinute, getUtcOffsetMinutes } from "@/lib/timezone-utils";
 import { getGradientForHour } from "@/lib/sky-gradients";
 
 // Pre-index for O(1) lookups instead of O(n) .find() per timezone
@@ -9,16 +9,15 @@ const TIMEZONE_INDEX = new Map<string, TimezoneEntry>(
   ALL_TIMEZONES.map((tz) => [tz.timezone, tz])
 );
 
-// Get UTC offset in milliseconds for a timezone
-function getUtcOffset(timezone: string, now: Date): number {
-  const utcDate = getRegionTime("UTC", now);
-  const tzDate = getRegionTime(timezone, now);
-  return tzDate.getTime() - utcDate.getTime();
-}
-
 export interface Region {
-  /** Unique place id (may equal tz or be an aliased 'tz#place' string). */
+  /** Slugified id, safe for DOM ids and React keys. */
   id: string;
+  /**
+   * The original place id this region was built from — an IANA zone or an
+   * aliased 'tz#place' string. Persist *this*, never the resolved timezone, or
+   * aliased places (e.g. Redmond) collapse into their base zone.
+   */
+  placeId: string;
   name: string;
   city: string;
   /** Resolved IANA timezone for time/date math. */
@@ -47,6 +46,11 @@ function skyColorForTimezone(timezone: string, now: Date): [number, number, numb
   return hexToRgb(gradient.via);
 }
 
+/** True if a place id maps to a timezone we actually have data for. */
+export function isKnownPlaceId(placeId: string): boolean {
+  return TIMEZONE_INDEX.has(resolveTimezone(placeId));
+}
+
 export function regionsFromTimezones(placeIds: string[], now?: Date, customOrder?: boolean): Region[] {
   const currentTime = now ?? new Date();
   const regions = placeIds
@@ -63,6 +67,7 @@ export function regionsFromTimezones(placeIds: string[], now?: Date, customOrder
 
       return {
         id: placeId.replace(/[\/#]/g, "-").toLowerCase(),
+        placeId,
         name: continent,
         city: label,
         timezone: tz,
@@ -77,8 +82,8 @@ export function regionsFromTimezones(placeIds: string[], now?: Date, customOrder
   // Otherwise sort by UTC offset (west → east).
   if (!customOrder) {
     regions.sort((a, b) => {
-      const aOff = getUtcOffset(a.timezone, currentTime);
-      const bOff = getUtcOffset(b.timezone, currentTime);
+      const aOff = getUtcOffsetMinutes(a.timezone, currentTime);
+      const bOff = getUtcOffsetMinutes(b.timezone, currentTime);
       return aOff - bOff;
     });
   }

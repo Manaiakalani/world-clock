@@ -2,15 +2,36 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { DEFAULT_TIMEZONES } from "@/data/timezone-data";
+import { isKnownPlaceId } from "@/data/regions";
 import { useLocalStorageState } from "./use-local-storage-state";
 
 const STORAGE_KEY = "world-clock-active-timezones";
 const URL_PARAM = "zones";
+/** Upper bound on tracked zones — a shared link shouldn't be able to ask the
+ *  browser to build, sort and weather-fetch an unbounded region list. */
+const MAX_ZONES = 50;
+
+/**
+ * Drop unknown ids, collapse duplicates (they'd produce duplicate React keys and
+ * duplicate weather requests) and cap the length. Returns null when nothing
+ * usable survives so callers can fall back to the defaults.
+ */
+function sanitize(ids: unknown[]): string[] | null {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (typeof id !== "string" || seen.has(id) || !isKnownPlaceId(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= MAX_ZONES) break;
+  }
+  return out.length > 0 ? out : null;
+}
 
 function parseTimezones(raw: string): string[] {
   const parsed = JSON.parse(raw);
-  if (Array.isArray(parsed) && parsed.length > 0) {
-    return parsed.filter((t): t is string => typeof t === "string");
+  if (Array.isArray(parsed)) {
+    return sanitize(parsed) ?? DEFAULT_TIMEZONES;
   }
   return DEFAULT_TIMEZONES;
 }
@@ -20,10 +41,7 @@ function readFromUrlParams(): string[] | null {
   try {
     const params = new URLSearchParams(window.location.search);
     const zones = params.get(URL_PARAM);
-    if (zones) {
-      const parsed = zones.split(",").filter(Boolean);
-      if (parsed.length > 0) return parsed;
-    }
+    if (zones) return sanitize(zones.split(",").filter(Boolean));
   } catch {}
   return null;
 }
@@ -60,7 +78,11 @@ export function useActiveTimezones() {
   const toggle = useCallback(
     (tz: string) => {
       setActiveTimezones((prev) =>
-        prev.includes(tz) ? prev.filter((t) => t !== tz) : [...prev, tz],
+        prev.includes(tz)
+          ? prev.filter((t) => t !== tz)
+          : prev.length >= MAX_ZONES
+            ? prev
+            : [...prev, tz],
       );
     },
     [setActiveTimezones],
@@ -72,7 +94,7 @@ export function useActiveTimezones() {
   );
 
   const setTimezones = useCallback(
-    (tzs: string[]) => setActiveTimezones(tzs),
+    (tzs: string[]) => setActiveTimezones(sanitize(tzs) ?? DEFAULT_TIMEZONES),
     [setActiveTimezones],
   );
 

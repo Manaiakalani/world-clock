@@ -1,4 +1,5 @@
 import { ALL_TIMEZONES } from "@/data/timezone-data";
+import { getUtcOffsetMinutes } from "@/lib/timezone-utils";
 
 /**
  * Maps common abbreviations, informal names, and city nicknames to IANA timezone IDs.
@@ -177,6 +178,40 @@ const TIMEZONE_ALIAS_MAP: Record<string, string[]> = {
 const KNOWN_TIMEZONES = new Set(ALL_TIMEZONES.map((tz) => tz.timezone));
 
 /**
+ * ALL_TIMEZONES still uses several pre-2017 IANA spellings as its stable ids so
+ * that saved preferences and shared URLs keep resolving. Aliases are written
+ * against the modern canonical names, so map them back before matching —
+ * otherwise entries like "delhi", "utc" or "saigon" silently return nothing.
+ */
+const LEGACY_ID_BY_CANONICAL: Record<string, string> = {
+  "Africa/Asmara": "Africa/Asmera",
+  "America/Argentina/Buenos_Aires": "America/Buenos_Aires",
+  "America/Argentina/Catamarca": "America/Catamarca",
+  "America/Argentina/Cordoba": "America/Cordoba",
+  "America/Argentina/Jujuy": "America/Jujuy",
+  "America/Argentina/Mendoza": "America/Mendoza",
+  "America/Indiana/Indianapolis": "America/Indianapolis",
+  "America/Kentucky/Louisville": "America/Louisville",
+  "America/Nuuk": "America/Godthab",
+  "Asia/Ho_Chi_Minh": "Asia/Saigon",
+  "Asia/Kathmandu": "Asia/Katmandu",
+  "Asia/Kolkata": "Asia/Calcutta",
+  "Asia/Yangon": "Asia/Rangoon",
+  "Atlantic/Faroe": "Atlantic/Faeroe",
+  "Etc/GMT": "UTC",
+  "Etc/UTC": "UTC",
+  "Europe/Kyiv": "Europe/Kiev",
+  "Pacific/Chuuk": "Pacific/Truk",
+  "Pacific/Kanton": "Pacific/Enderbury",
+  "Pacific/Pohnpei": "Pacific/Ponape",
+};
+
+function canonicalToKnownId(tz: string): string {
+  if (KNOWN_TIMEZONES.has(tz)) return tz;
+  return LEGACY_ID_BY_CANONICAL[tz] ?? tz;
+}
+
+/**
  * Parse a UTC/GMT offset string like "UTC+8", "GMT-5", "UTC+5:30", "GMT+0" into
  * total offset minutes. Returns null if not a valid offset pattern.
  */
@@ -194,55 +229,15 @@ function parseOffsetQuery(query: string): number | null {
 
 /**
  * Get the current UTC offset in minutes for a given IANA timezone.
+ *
+ * Delegates to the shared helper, which anchors both sides in UTC. Building the
+ * comparison Dates in the *viewer's* timezone (as this used to) meant that on
+ * the viewer's own DST-transition day one side could land in the skipped or
+ * repeated local hour and get normalised by an hour, bucketing unrelated zones
+ * under the wrong offset.
  */
 function getCurrentOffsetMinutes(timezone: string): number {
-  const now = new Date();
-  // Intl gives us the offset implicitly — format a date in the tz and in UTC, then diff
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const parts = fmt.formatToParts(now);
-  const get = (type: string) =>
-    parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
-  const tzDate = new Date(
-    get("year"),
-    get("month") - 1,
-    get("day"),
-    get("hour"),
-    get("minute"),
-    get("second")
-  );
-
-  const utcFmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const utcParts = utcFmt.formatToParts(now);
-  const getUtc = (type: string) =>
-    parseInt(utcParts.find((p) => p.type === type)?.value || "0", 10);
-  const utcDate = new Date(
-    getUtc("year"),
-    getUtc("month") - 1,
-    getUtc("day"),
-    getUtc("hour"),
-    getUtc("minute"),
-    getUtc("second")
-  );
-
-  return Math.round((tzDate.getTime() - utcDate.getTime()) / 60000);
+  return getUtcOffsetMinutes(timezone, new Date());
 }
 
 /**
@@ -289,10 +284,11 @@ export function resolveTimezoneQuery(query: string): AliasMatch[] {
   const results: AliasMatch[] = [];
 
   function addResult(tz: string, via: string) {
-    if (seen.has(tz)) return;
-    if (!KNOWN_TIMEZONES.has(tz)) return;
-    seen.add(tz);
-    results.push({ timezone: tz, matchedVia: via });
+    const id = canonicalToKnownId(tz);
+    if (seen.has(id)) return;
+    if (!KNOWN_TIMEZONES.has(id)) return;
+    seen.add(id);
+    results.push({ timezone: id, matchedVia: via });
   }
 
   // 1. Direct alias lookup (exact match)

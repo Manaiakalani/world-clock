@@ -4,8 +4,8 @@ import { memo, useId, useMemo } from "react";
 import { Region } from "@/data/regions";
 import {
   formatTime,
-  getOffsetFromLocal,
-  formatOffset,
+  getOffsetMinutesFromLocal,
+  formatOffsetMinutes,
   isWorkingHours,
   isAwake,
   getRegionHour,
@@ -16,6 +16,7 @@ import {
   getDevInfo,
   formatDateLong,
   formatSunTime,
+  getRegionDateParts,
 } from "@/lib/timezone-utils";
 import { getGradientForHour, gradientToCSS } from "@/lib/sky-gradients";
 import { type WeatherData } from "@/lib/weather";
@@ -55,8 +56,8 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
   const time = formatTime(region.timezone, now, is24h);
   const hour = getRegionHour(region.timezone, now);
   const minute = getRegionMinute(region.timezone, now);
-  const offset = getOffsetFromLocal(region.timezone, now);
-  const offsetStr = isLocal ? "Local" : formatOffset(offset);
+  const offset = getOffsetMinutesFromLocal(region.timezone, now);
+  const offsetStr = isLocal ? "Local" : formatOffsetMinutes(offset);
   const dayDiff = localTimezone ? getDayDifference(region.timezone, localTimezone, now) : null;
   const working = isWorkingHours(region.timezone, now);
   const awake = isAwake(region.timezone, now);
@@ -70,8 +71,11 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
   const sunsetHour = useMemo(() => localHourFromIso(weather?.sunset), [weather?.sunset]);
   const dialHour = hour + minute / 60;
 
-  // DST transitions are stable within a day — only recompute when the date changes
-  const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  // DST transitions and the displayed date are stable within a day — but the day
+  // that matters is the *region's*, not the viewer's, or an expanded card keeps
+  // showing yesterday until the viewer's own midnight rolls over.
+  const regionDay = getRegionDateParts(region.timezone, now);
+  const dayKey = `${regionDay.year}-${regionDay.month}-${regionDay.day}`;
   const dstTransition = useMemo(
     () => getNextDstTransition(region.timezone, now),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,17 +89,18 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
     [isActive, region.timezone, dayKey]
   );
   const sunriseStr = useMemo(
-    () => isActive && weather?.sunrise ? formatSunTime(region.timezone, weather.sunrise, is24h) : "",
-    [isActive, region.timezone, weather?.sunrise, is24h]
+    () => isActive && weather?.sunrise ? formatSunTime(weather.sunrise, is24h) : "",
+    [isActive, weather?.sunrise, is24h]
   );
   const sunsetStr = useMemo(
-    () => isActive && weather?.sunset ? formatSunTime(region.timezone, weather.sunset, is24h) : "",
-    [isActive, region.timezone, weather?.sunset, is24h]
+    () => isActive && weather?.sunset ? formatSunTime(weather.sunset, is24h) : "",
+    [isActive, weather?.sunset, is24h]
   );
+  // Dev info reports the exact instant, so it must track `now` itself — keying on
+  // `minute` alone left it stale whenever the time slider moved by whole hours.
   const devInfo = useMemo(
     () => isActive && devMode ? getDevInfo(region.timezone, now) : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isActive, devMode, region.timezone, minute]
+    [isActive, devMode, region.timezone, now]
   );
 
   return (
