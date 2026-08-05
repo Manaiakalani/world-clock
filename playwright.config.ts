@@ -8,6 +8,11 @@ const baseURL = `http://localhost:${port}`;
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
+  // The HTML report is what CI uploads as an artifact; it is not produced by
+  // the default reporter, so ask for it explicitly.
+  reporter: process.env.CI
+    ? [["html", { open: "never" }], ["github"]]
+    : [["html", { open: "never" }], ["list"]],
   use: {
     baseURL,
     // Enable WebGL rendering in headless mode so COBE globe is visible

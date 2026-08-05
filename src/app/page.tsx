@@ -235,7 +235,14 @@ export default function WorldClockPage() {
           </div>
         )}
 
-        <main id="main-content" className="flex min-h-0 flex-1 flex-col md:flex-row gap-3 px-4 pb-20 xl:pb-3 sm:px-6 lg:gap-6 lg:px-8">
+        <main
+          id="main-content"
+          className={`flex min-h-0 flex-1 flex-col md:flex-row gap-3 px-4 sm:px-6 lg:gap-6 lg:px-8 ${
+            // Only reserve room for the bottom nav when it is actually mounted,
+            // otherwise the sub-views leave an empty 80px band beneath them.
+            showManager || showMeetingPlanner ? "pb-3" : "pb-20 xl:pb-3"
+          }`}
+        >
           {/* Globe — left side (hidden on mobile, visible from lg up) */}
           <div className="hidden md:flex flex-1 items-center justify-center min-h-0">
             <GlobeViewer

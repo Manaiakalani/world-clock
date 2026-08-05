@@ -88,7 +88,7 @@ test("header action buttons do not steal each other's clicks", async ({ page }) 
   }
 });
 
-// Below `lg` the header icon row is hidden because the 340-420px panel cannot
+// Below `xl` the header icon row is hidden because the 340-420px panel cannot
 // fit it without pushing buttons past the right edge of a viewport that has no
 // horizontal scrollbar. The fixed bottom nav must therefore be reachable there.
 test("primary actions stay reachable below the xl breakpoint", async ({ page }) => {
