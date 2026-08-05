@@ -1,4 +1,5 @@
 import { ALL_TIMEZONES } from "@/data/timezone-data";
+import { getUtcOffsetMinutes } from "@/lib/timezone-utils";
 
 /**
  * Maps common abbreviations, informal names, and city nicknames to IANA timezone IDs.
@@ -228,55 +229,15 @@ function parseOffsetQuery(query: string): number | null {
 
 /**
  * Get the current UTC offset in minutes for a given IANA timezone.
+ *
+ * Delegates to the shared helper, which anchors both sides in UTC. Building the
+ * comparison Dates in the *viewer's* timezone (as this used to) meant that on
+ * the viewer's own DST-transition day one side could land in the skipped or
+ * repeated local hour and get normalised by an hour, bucketing unrelated zones
+ * under the wrong offset.
  */
 function getCurrentOffsetMinutes(timezone: string): number {
-  const now = new Date();
-  // Intl gives us the offset implicitly — format a date in the tz and in UTC, then diff
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const parts = fmt.formatToParts(now);
-  const get = (type: string) =>
-    parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
-  const tzDate = new Date(
-    get("year"),
-    get("month") - 1,
-    get("day"),
-    get("hour"),
-    get("minute"),
-    get("second")
-  );
-
-  const utcFmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const utcParts = utcFmt.formatToParts(now);
-  const getUtc = (type: string) =>
-    parseInt(utcParts.find((p) => p.type === type)?.value || "0", 10);
-  const utcDate = new Date(
-    getUtc("year"),
-    getUtc("month") - 1,
-    getUtc("day"),
-    getUtc("hour"),
-    getUtc("minute"),
-    getUtc("second")
-  );
-
-  return Math.round((tzDate.getTime() - utcDate.getTime()) / 60000);
+  return getUtcOffsetMinutes(timezone, new Date());
 }
 
 /**

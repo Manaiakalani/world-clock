@@ -289,10 +289,10 @@ export default function WorldClockPage() {
                       <List className="h-3.5 w-3.5 hidden sm:block" />
                     </div>
                     {/* Desktop / tablet icon row — hidden on phones in favor of the bottom action bar */}
-                    <div className="hidden sm:flex items-center gap-1.5 border-l border-border/60 pl-3">
+                    <div className="hidden sm:flex items-center gap-3 border-l border-border/60 pl-3">
                     <button
                       onClick={toggleTimeFormat}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-2
+                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1.5
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95] text-[10px] sm:text-xs font-bold"
                       style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
@@ -302,7 +302,7 @@ export default function WorldClockPage() {
                     </button>
                     <button
                       onClick={() => { openedViaKeyboard.current = false; setShowManager(true); setShowMeetingPlanner(false); }}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-2
+                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1.5
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
                       style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
@@ -312,7 +312,7 @@ export default function WorldClockPage() {
                     </button>
                     <button
                       onClick={() => { openedViaKeyboard.current = false; setShowMeetingPlanner(true); setShowManager(false); }}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-2
+                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1.5
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
                       style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
@@ -322,7 +322,7 @@ export default function WorldClockPage() {
                     </button>
                     <button
                       onClick={handleShare}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-2
+                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1.5
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
                       style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
@@ -336,7 +336,7 @@ export default function WorldClockPage() {
                     </button>
                     <button
                       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-2
+                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1.5
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
                       style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
@@ -350,7 +350,7 @@ export default function WorldClockPage() {
                     </button>
                     <button
                       onClick={() => { openedViaKeyboard.current = false; setShowAbout(true); }}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-2
+                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1.5
                                  bg-background/50 transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]"
                       style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
@@ -360,7 +360,7 @@ export default function WorldClockPage() {
                     </button>
                     <button
                       onClick={toggleCustomOrder}
-                      className={`relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-2
+                      className={`relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1.5
                                  transition-[transform,background-color] duration-160
                                  hover:bg-accent active:scale-[0.95]
                                  ${customOrder ? "bg-accent/80" : "bg-background/50"}`}

@@ -27,6 +27,50 @@ test("security headers present and no CSP violations at runtime", async ({ page 
   expect(violations).toEqual([]);
 });
 
+// Regression guard: the header icon buttons use an expanded `::after` hit area.
+// If that extension is wider than the flex gap it overlaps the neighbouring
+// button, and because the later sibling paints on top, clicks near a button's
+// right edge fire the WRONG action.
+test("header action buttons do not steal each other's clicks", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+
+  const labels = [
+    "Toggle clock view",
+    "Toggle time format",
+    "Manage timezones",
+    "Meeting planner",
+    "Copy shareable link",
+    "Toggle theme",
+    "About World Clock",
+  ];
+
+  const mismatches: string[] = [];
+  let checked = 0;
+
+  for (const label of labels) {
+    const btn = page.locator(`button[aria-label="${label}"]`).first();
+    if ((await btn.count()) === 0 || !(await btn.isVisible())) continue;
+    const box = await btn.boundingBox();
+    if (!box) continue;
+    checked++;
+
+    const y = box.y + box.height / 2;
+    for (const x of [box.x + 1, box.x + box.width / 2, box.x + box.width - 1]) {
+      const hit = await page.evaluate(
+        ([px, py]) => {
+          const el = document.elementFromPoint(px as number, py as number);
+          return el?.closest("button")?.getAttribute("aria-label") ?? null;
+        },
+        [x, y]
+      );
+      if (hit !== label) mismatches.push(`"${label}" at x=${Math.round(x)} hit "${hit}"`);
+    }
+  }
+
+  expect(checked).toBeGreaterThan(1);
+  expect(mismatches).toEqual([]);
+});
 // Regression guard: ALL_TIMEZONES keeps several pre-2017 IANA ids, while the
 // alias table is written against modern canonical names. Without the mapping
 // between them these very common queries silently return nothing.

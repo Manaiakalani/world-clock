@@ -94,7 +94,8 @@ export function MeetingPlanner({ regions, now, onClose, instant }: MeetingPlanne
       {/* Time grid */}
       <div className="min-h-0 flex-1 overflow-y-auto" role="grid" aria-label="Meeting planner showing working hour overlaps">
         {/* Hour labels row — viewer-local time for each slot */}
-        <div className="flex items-end gap-px mb-1 pl-[88px] sm:pl-[100px]" role="row">
+        <div className="flex items-end gap-px mb-1" role="row">
+          <div className="w-[88px] sm:w-[100px] shrink-0" role="columnheader" aria-label="Region" />
           {slots.map((slot, i) => {
             const displayHour = slot.getHours();
             return (
@@ -115,7 +116,10 @@ export function MeetingPlanner({ regions, now, onClose, instant }: MeetingPlanne
         {regionRows.map(({ region, cells }) => (
           <div key={region.id} className="flex items-center gap-px mb-px" role="row">
             {/* Region label */}
-            <div className="w-[88px] sm:w-[100px] shrink-0 flex items-center gap-1.5 pr-2">
+            <div
+              role="rowheader"
+              className="w-[88px] sm:w-[100px] shrink-0 flex items-center gap-1.5 pr-2"
+            >
               <span className="text-xs leading-none">{region.flag}</span>
               <span className="text-[10px] sm:text-[11px] font-medium truncate">{region.city}</span>
             </div>

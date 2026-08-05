@@ -1,18 +1,23 @@
 import { defineConfig } from "@playwright/test";
 
+// Port is configurable so a run can't accidentally latch onto an unrelated
+// server that already owns 3000 (reuseExistingServer would happily use it).
+const port = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
+const baseURL = `http://localhost:${port}`;
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     // Enable WebGL rendering in headless mode so COBE globe is visible
     launchOptions: {
       args: ["--use-gl=angle", "--use-angle=swiftshader"],
     },
   },
   webServer: {
-    command: "npm run build && npm run start",
-    url: "http://localhost:3000",
+    command: `npm run build && npm run start -- --port ${port}`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

@@ -125,8 +125,15 @@ export function useWeather(locations: LocationInput[]) {
       if (signal?.aborted) return;
       if (Object.keys(results).length === 0) return;
 
+      // Keep only the locations this run was actually about, so removing a city
+      // drops its reading instead of leaving it in state and the cache forever.
+      const wanted = new Set(locations.map((loc) => loc.id));
       setWeather((prev) => {
-        const merged = { ...prev, ...results };
+        const merged: Record<string, WeatherData> = {};
+        for (const [id, value] of Object.entries(prev)) {
+          if (wanted.has(id)) merged[id] = value;
+        }
+        Object.assign(merged, results);
         saveCache(merged);
         return merged;
       });

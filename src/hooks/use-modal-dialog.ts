@@ -44,6 +44,10 @@ export function useModalDialog<T extends HTMLElement>(
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        // The page-level window handler also acts on Escape (it closes the time
+        // slider and resets the offset). Without this the same keypress would
+        // dismiss the dialog *and* discard the user's time travel state.
+        e.stopPropagation();
         onCloseRef.current();
         return;
       }
