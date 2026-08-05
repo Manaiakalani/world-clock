@@ -28,15 +28,11 @@ export function getRegionTimeParts(timezone: string, now: Date = new Date()): { 
   };
 }
 
-export function getRegionTime(timezone: string, now: Date = new Date()): Date {
-  const p = getRegionDateParts(timezone, now);
-  return new Date(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-}
-
 /**
- * Wall-clock field values for a timezone. Prefer this over {@link getRegionTime}
- * for arithmetic: the Date that function returns is constructed in the *browser's*
- * timezone, so browser DST gaps/overlaps can skew an unrelated timezone's math.
+ * Wall-clock field values for a timezone. Use this (with Date.UTC) for any
+ * arithmetic. A Date built from these parts via the plain `new Date(y, m, d,
+ * ...)` constructor lands in the *browser's* timezone, so browser DST
+ * gaps/overlaps would skew an unrelated timezone's math.
  */
 export function getRegionDateParts(
   timezone: string,

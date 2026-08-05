@@ -206,7 +206,7 @@ const LEGACY_ID_BY_CANONICAL: Record<string, string> = {
   "Pacific/Pohnpei": "Pacific/Ponape",
 };
 
-function canonicalToKnownId(tz: string): string {
+export function canonicalToKnownId(tz: string): string {
   if (KNOWN_TIMEZONES.has(tz)) return tz;
   return LEGACY_ID_BY_CANONICAL[tz] ?? tz;
 }

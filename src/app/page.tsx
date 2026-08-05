@@ -8,6 +8,7 @@ import { useActiveTimezones } from "@/hooks/use-active-timezones";
 import { useTimeFormat } from "@/hooks/use-time-format";
 import { useWeather } from "@/hooks/use-weather";
 import { regionsFromTimezones } from "@/data/regions";
+import { canonicalToKnownId } from "@/data/timezone-aliases";
 import { GlobeViewer } from "@/components/globe-viewer";
 import { AnalogClock } from "@/components/analog-clock";
 import { RegionList } from "@/components/region-list";
@@ -119,8 +120,13 @@ export default function WorldClockPage() {
     });
   }, [getShareUrl]);
 
+  // ALL_TIMEZONES stores several pre-2017 IANA ids (Asia/Calcutta, Europe/Kiev,
+  // Asia/Saigon) so saved prefs and shared links keep resolving. Chromium's
+  // Intl happens to canonicalize *to* those legacy names today, but engines are
+  // moving toward the IANA primary ids, so map through the same bridge the
+  // search resolver uses instead of relying on that.
   const localTimezone = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    () => canonicalToKnownId(Intl.DateTimeFormat().resolvedOptions().timeZone),
     []
   );
 
