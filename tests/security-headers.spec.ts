@@ -32,9 +32,6 @@ test("security headers present and no CSP violations at runtime", async ({ page 
 // button, and because the later sibling paints on top, clicks near a button's
 // right edge fire the WRONG action.
 test("header action buttons do not steal each other's clicks", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
-
   const labels = [
     "Toggle clock view",
     "Toggle time format",
@@ -43,33 +40,88 @@ test("header action buttons do not steal each other's clicks", async ({ page }) 
     "Copy shareable link",
     "Toggle theme",
     "About World Clock",
+    "Custom order (drag to reorder)",
+    "Sort by time",
   ];
 
-  const mismatches: string[] = [];
-  let checked = 0;
+  // The icon row is `hidden xl:flex`; below that the fixed bottom nav takes over.
+  for (const width of [1280, 1440, 1600, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
 
-  for (const label of labels) {
-    const btn = page.locator(`button[aria-label="${label}"]`).first();
-    if ((await btn.count()) === 0 || !(await btn.isVisible())) continue;
-    const box = await btn.boundingBox();
-    if (!box) continue;
-    checked++;
+    const problems: string[] = [];
+    let checked = 0;
 
-    const y = box.y + box.height / 2;
-    for (const x of [box.x + 1, box.x + box.width / 2, box.x + box.width - 1]) {
-      const hit = await page.evaluate(
-        ([px, py]) => {
-          const el = document.elementFromPoint(px as number, py as number);
-          return el?.closest("button")?.getAttribute("aria-label") ?? null;
-        },
-        [x, y]
-      );
-      if (hit !== label) mismatches.push(`"${label}" at x=${Math.round(x)} hit "${hit}"`);
+    for (const label of labels) {
+      const btn = page.locator(`button[aria-label="${label}"]`).first();
+      if ((await btn.count()) === 0 || !(await btn.isVisible())) continue;
+      const box = await btn.boundingBox();
+      if (!box) continue;
+      checked++;
+
+      // Fully within the viewport — an off-screen button is unclickable because
+      // the row's ancestor clips overflow and offers no horizontal scrollbar.
+      if (box.x < 0 || box.x + box.width > width) {
+        problems.push(
+          `${width}px: "${label}" spans ${Math.round(box.x)}..${Math.round(box.x + box.width)}, outside viewport`
+        );
+        continue;
+      }
+
+      const y = box.y + box.height / 2;
+      for (const x of [box.x + 1, box.x + box.width / 2, box.x + box.width - 1]) {
+        const hit = await page.evaluate(
+          ([px, py]) => {
+            const el = document.elementFromPoint(px as number, py as number);
+            return el?.closest("button")?.getAttribute("aria-label") ?? null;
+          },
+          [x, y]
+        );
+        if (hit !== label) {
+          problems.push(`${width}px: "${label}" at x=${Math.round(x)} hit "${hit}"`);
+        }
+      }
+    }
+
+    expect(checked, `no header buttons found at ${width}px`).toBeGreaterThan(1);
+    expect(problems).toEqual([]);
+  }
+});
+
+// Below `lg` the header icon row is hidden because the 340-420px panel cannot
+// fit it without pushing buttons past the right edge of a viewport that has no
+// horizontal scrollbar. The fixed bottom nav must therefore be reachable there.
+test("primary actions stay reachable below the xl breakpoint", async ({ page }) => {
+  for (const width of [640, 768, 900, 1024, 1152, 1279]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    const nav = page.locator('nav[aria-label="Primary actions"]');
+    await expect(nav, `bottom nav missing at ${width}px`).toBeVisible();
+
+    const box = await nav.boundingBox();
+    expect(box, `bottom nav has no box at ${width}px`).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(Math.round(box!.x + box!.width)).toBeLessThanOrEqual(width);
+
+    // Every action in the bar must be inside the viewport and actually on top.
+    const buttons = nav.locator("button");
+    const count = await buttons.count();
+    expect(count, `no actions in bottom nav at ${width}px`).toBeGreaterThan(1);
+
+    for (let i = 0; i < count; i++) {
+      const btn = buttons.nth(i);
+      const label = (await btn.getAttribute("aria-label")) ?? (await btn.innerText());
+      const bb = await btn.boundingBox();
+      expect(bb, `"${label}" has no box at ${width}px`).not.toBeNull();
+      expect(bb!.x, `"${label}" clipped left at ${width}px`).toBeGreaterThanOrEqual(0);
+      expect(
+        Math.round(bb!.x + bb!.width),
+        `"${label}" clipped right at ${width}px`
+      ).toBeLessThanOrEqual(width);
+      await expect(btn, `"${label}" not clickable at ${width}px`).toBeEnabled();
     }
   }
-
-  expect(checked).toBeGreaterThan(1);
-  expect(mismatches).toEqual([]);
 });
 // Regression guard: ALL_TIMEZONES keeps several pre-2017 IANA ids, while the
 // alias table is written against modern canonical names. Without the mapping
