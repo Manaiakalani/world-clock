@@ -1,6 +1,8 @@
 "use client";
 
+import { useId } from "react";
 import { X, Github, Keyboard, Shield } from "lucide-react";
+import { useModalDialog } from "@/hooks/use-modal-dialog";
 
 interface AboutDialogProps {
   onClose: () => void;
@@ -8,25 +10,36 @@ interface AboutDialogProps {
 }
 
 export function AboutDialog({ onClose, instant }: AboutDialogProps) {
+  const titleId = useId();
+  const dialogRef = useModalDialog<HTMLDivElement>(onClose);
+
   return (
     <>
       {/* Backdrop */}
       <div
         className={`fixed inset-0 z-50 bg-black/50${instant ? " no-animate" : ""}`}
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Dialog */}
-      <div className={`fixed inset-x-0 top-[10%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden${instant ? " no-animate" : ""}`}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`fixed inset-x-0 top-[10%] z-50 mx-auto w-[90%] max-w-md rounded-xl border border-border bg-popover shadow-2xl overflow-hidden${instant ? " no-animate" : ""}`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold">World Clock</h2>
+            <h2 id={titleId} className="text-base font-semibold">World Clock</h2>
             <p className="text-[11px] text-muted-foreground">Global Timezone Tracker</p>
           </div>
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent transition-colors"
+            className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />

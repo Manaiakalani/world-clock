@@ -177,6 +177,40 @@ const TIMEZONE_ALIAS_MAP: Record<string, string[]> = {
 const KNOWN_TIMEZONES = new Set(ALL_TIMEZONES.map((tz) => tz.timezone));
 
 /**
+ * ALL_TIMEZONES still uses several pre-2017 IANA spellings as its stable ids so
+ * that saved preferences and shared URLs keep resolving. Aliases are written
+ * against the modern canonical names, so map them back before matching —
+ * otherwise entries like "delhi", "utc" or "saigon" silently return nothing.
+ */
+const LEGACY_ID_BY_CANONICAL: Record<string, string> = {
+  "Africa/Asmara": "Africa/Asmera",
+  "America/Argentina/Buenos_Aires": "America/Buenos_Aires",
+  "America/Argentina/Catamarca": "America/Catamarca",
+  "America/Argentina/Cordoba": "America/Cordoba",
+  "America/Argentina/Jujuy": "America/Jujuy",
+  "America/Argentina/Mendoza": "America/Mendoza",
+  "America/Indiana/Indianapolis": "America/Indianapolis",
+  "America/Kentucky/Louisville": "America/Louisville",
+  "America/Nuuk": "America/Godthab",
+  "Asia/Ho_Chi_Minh": "Asia/Saigon",
+  "Asia/Kathmandu": "Asia/Katmandu",
+  "Asia/Kolkata": "Asia/Calcutta",
+  "Asia/Yangon": "Asia/Rangoon",
+  "Atlantic/Faroe": "Atlantic/Faeroe",
+  "Etc/GMT": "UTC",
+  "Etc/UTC": "UTC",
+  "Europe/Kyiv": "Europe/Kiev",
+  "Pacific/Chuuk": "Pacific/Truk",
+  "Pacific/Kanton": "Pacific/Enderbury",
+  "Pacific/Pohnpei": "Pacific/Ponape",
+};
+
+function canonicalToKnownId(tz: string): string {
+  if (KNOWN_TIMEZONES.has(tz)) return tz;
+  return LEGACY_ID_BY_CANONICAL[tz] ?? tz;
+}
+
+/**
  * Parse a UTC/GMT offset string like "UTC+8", "GMT-5", "UTC+5:30", "GMT+0" into
  * total offset minutes. Returns null if not a valid offset pattern.
  */
@@ -289,10 +323,11 @@ export function resolveTimezoneQuery(query: string): AliasMatch[] {
   const results: AliasMatch[] = [];
 
   function addResult(tz: string, via: string) {
-    if (seen.has(tz)) return;
-    if (!KNOWN_TIMEZONES.has(tz)) return;
-    seen.add(tz);
-    results.push({ timezone: tz, matchedVia: via });
+    const id = canonicalToKnownId(tz);
+    if (seen.has(id)) return;
+    if (!KNOWN_TIMEZONES.has(id)) return;
+    seen.add(id);
+    results.push({ timezone: id, matchedVia: via });
   }
 
   // 1. Direct alias lookup (exact match)

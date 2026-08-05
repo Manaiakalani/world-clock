@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { ALL_TIMEZONES, CONTINENTS, type TimezoneEntry } from "@/data/timezone-data";
 import { ALL_PLACE_OVERRIDES, resolveTimezone } from "@/data/places";
-import { formatTime, getOffsetFromLocal, formatOffset } from "@/lib/timezone-utils";
+import { formatTime, getOffsetMinutesFromLocal, formatOffsetMinutes } from "@/lib/timezone-utils";
 import { getFlagForTimezone } from "@/lib/timezone-flags";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -158,7 +158,7 @@ export function TimezoneManager({
               {isExpanded && (
                 <div className="flex flex-col gap-0.5 pb-2">
                   {timezones.map((tz) => {
-                    const offset = getOffsetFromLocal(tz.timezone, now);
+                    const offset = getOffsetMinutesFromLocal(tz.timezone, now);
                     const time = formatTime(tz.timezone, now, is24h);
                     const active = isActive(tz.placeId);
 
@@ -188,7 +188,7 @@ export function TimezoneManager({
                             {time}
                           </div>
                           <div className="text-[10px] text-muted-foreground" suppressHydrationWarning>
-                            {formatOffset(offset)}
+                            {formatOffsetMinutes(offset)}
                           </div>
                         </div>
                       </label>

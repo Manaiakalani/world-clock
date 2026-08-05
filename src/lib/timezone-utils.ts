@@ -29,6 +29,19 @@ export function getRegionTimeParts(timezone: string, now: Date = new Date()): { 
 }
 
 export function getRegionTime(timezone: string, now: Date = new Date()): Date {
+  const p = getRegionDateParts(timezone, now);
+  return new Date(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+}
+
+/**
+ * Wall-clock field values for a timezone. Prefer this over {@link getRegionTime}
+ * for arithmetic: the Date that function returns is constructed in the *browser's*
+ * timezone, so browser DST gaps/overlaps can skew an unrelated timezone's math.
+ */
+export function getRegionDateParts(
+  timezone: string,
+  now: Date = new Date()
+): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
   const parts = getCachedFormatter("en-US", {
     timeZone: timezone,
     year: "numeric",
@@ -40,7 +53,15 @@ export function getRegionTime(timezone: string, now: Date = new Date()): Date {
     hour12: false,
   }).formatToParts(now);
   const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
-  return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    // Intl can emit hour "24" for midnight under hour12:false in some engines.
+    hour: get("hour") % 24,
+    minute: get("minute"),
+    second: get("second"),
+  };
 }
 
 export function getRegionHour(timezone: string, now: Date = new Date()): number {
@@ -74,21 +95,30 @@ export function formatTimeFull(timezone: string, now: Date = new Date(), is24h: 
   }).format(now);
 }
 
-export function getOffsetFromLocal(
+/**
+ * Offset of `timezone` relative to the viewer's timezone, in minutes.
+ *
+ * Both sides go through UTC-anchored arithmetic so sub-hour zones (+05:45
+ * Kathmandu, +08:45 Eucla, +12:45 Chatham, the many :30 zones) are exact and
+ * the viewer's own DST rules can't contaminate the result.
+ */
+export function getOffsetMinutesFromLocal(
   timezone: string,
   now: Date = new Date()
 ): number {
   const localTz = getCachedFormatter(undefined, {}).resolvedOptions().timeZone;
-  const localDate = getRegionTime(localTz, now);
-  const remoteDate = getRegionTime(timezone, now);
-  return Math.round((remoteDate.getTime() - localDate.getTime()) / (1000 * 60 * 60));
+  return getUtcOffsetMinutes(timezone, now) - getUtcOffsetMinutes(localTz, now);
 }
 
-export function formatOffset(offsetHours: number): string {
-  if (offsetHours === 0) return "same time";
-  const sign = offsetHours > 0 ? "+" : "";
-  const abs = Math.abs(offsetHours);
-  return `${sign}${offsetHours}${abs === 1 ? " hour" : " hours"}`;
+export function formatOffsetMinutes(offsetMinutes: number): string {
+  if (offsetMinutes === 0) return "same time";
+  const sign = offsetMinutes > 0 ? "+" : "-";
+  const abs = Math.abs(offsetMinutes);
+  const hours = Math.floor(abs / 60);
+  const minutes = abs % 60;
+  if (hours === 0) return `${sign}${minutes}m`;
+  if (minutes === 0) return `${sign}${hours}h`;
+  return `${sign}${hours}h ${minutes}m`;
 }
 
 export function isWorkingHours(timezone: string, now: Date = new Date()): boolean {
@@ -117,13 +147,14 @@ export function getDayDifference(timezone: string, localTimezone: string, now: D
     day: "2-digit",
   };
 
-  // Use formatToParts for locale-safe date extraction
+  // Use formatToParts for locale-safe date extraction. UTC arithmetic keeps the
+  // viewer's DST rules from turning a day boundary into a 23h/25h span.
   const getDay = (tz: string) => {
     const parts = getCachedFormatter("en-US", { ...opts, timeZone: tz }).formatToParts(now);
     const year = parseInt(parts.find((p) => p.type === "year")!.value);
     const month = parseInt(parts.find((p) => p.type === "month")!.value);
     const day = parseInt(parts.find((p) => p.type === "day")!.value);
-    return new Date(year, month - 1, day).getTime();
+    return Date.UTC(year, month - 1, day);
   };
 
   const localD = getDay(localTimezone);
@@ -139,28 +170,12 @@ export function getDayDifference(timezone: string, localTimezone: string, now: D
   return null;
 }
 
-function getUtcOffsetMinutes(timezone: string, date: Date): number {
-  const parts = getCachedFormatter("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-
-  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
-  const tzYear = get("year");
-  const tzMonth = get("month");
-  const tzDay = get("day");
-  const tzHour = get("hour") % 24;
-  const tzMinute = get("minute");
-
-  // Build a UTC timestamp from the timezone's local representation
-  const tzAsUtc = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMinute);
-  // The offset is the difference between the timezone's local time (interpreted as UTC) and the actual UTC instant
-  return Math.round((tzAsUtc - date.getTime()) / 60000);
+export function getUtcOffsetMinutes(timezone: string, date: Date): number {
+  const p = getRegionDateParts(timezone, date);
+  // Build a UTC timestamp from the timezone's local representation; the delta
+  // against the real instant is the zone's offset.
+  const tzAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+  return Math.round((tzAsUtc - Math.floor(date.getTime() / 60000) * 60000) / 60000);
 }
 
 export function getNextDstTransition(
@@ -199,13 +214,24 @@ export function formatDateLong(timezone: string, now: Date = new Date()): string
   }).format(now);
 }
 
-export function formatSunTime(timezone: string, isoString: string, is24h?: boolean): string {
-  return getCachedFormatter("en-US", {
-    timeZone: timezone,
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: !is24h,
-  }).format(new Date(isoString));
+/**
+ * Format an Open-Meteo sunrise/sunset value.
+ *
+ * With `timezone=auto` the API returns a bare local wall-clock string for the
+ * *queried location* (e.g. "2026-08-05T05:32") with no UTC offset. `new Date()`
+ * would parse that as the viewer's local time and shift it, so read the fields
+ * straight off the string instead of round-tripping through Date.
+ */
+export function formatSunTime(isoString: string, is24h?: boolean): string {
+  const m = /T(\d{2}):(\d{2})/.exec(isoString);
+  if (!m) return "";
+  const hour = parseInt(m[1], 10) % 24;
+  const minute = parseInt(m[2], 10);
+  const mm = String(minute).padStart(2, "0");
+  if (is24h) return `${String(hour).padStart(2, "0")}:${mm}`;
+  const suffix = hour < 12 ? "AM" : "PM";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${mm} ${suffix}`;
 }
 
 export function getTimezoneAbbr(timezone: string, now: Date = new Date()): string {
@@ -243,32 +269,33 @@ export function getDevInfo(timezone: string, now: Date = new Date()): DevInfo {
   }
 
   // Build ISO 8601 string for the timezone
-  const regionTime = getRegionTime(timezone, now);
+  const p = getRegionDateParts(timezone, now);
   const absH = Math.floor(Math.abs(offsetMinutes) / 60);
   const absM = Math.abs(offsetMinutes) % 60;
   const offsetSign = offsetMinutes >= 0 ? "+" : "-";
   const offsetFormatted = `${offsetSign}${String(absH).padStart(2, "0")}:${String(absM).padStart(2, "0")}`;
 
+  const pad = (n: number) => String(n).padStart(2, "0");
   const iso =
-    `${regionTime.getFullYear()}-${String(regionTime.getMonth() + 1).padStart(2, "0")}-${String(regionTime.getDate()).padStart(2, "0")}` +
-    `T${String(regionTime.getHours()).padStart(2, "0")}:${String(regionTime.getMinutes()).padStart(2, "0")}:${String(regionTime.getSeconds()).padStart(2, "0")}` +
+    `${p.year}-${pad(p.month)}-${pad(p.day)}` +
+    `T${pad(p.hour)}:${pad(p.minute)}:${pad(p.second)}` +
     offsetFormatted;
 
   // Unix timestamp (same for all timezones)
   const unix = Math.floor(now.getTime() / 1000);
 
-  // ISO week number
-  const regionDate = new Date(regionTime.getFullYear(), regionTime.getMonth(), regionTime.getDate());
-  const dayOfWeek = regionDate.getDay() || 7; // Mon=1 .. Sun=7
-  const thursday = new Date(regionDate);
-  thursday.setDate(regionDate.getDate() + 4 - dayOfWeek);
-  const yearStart = new Date(thursday.getFullYear(), 0, 1);
-  const week = Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  // ISO week number. All day arithmetic runs in UTC so the viewer's own DST
+  // transitions can't shift a 24h step into 23h/25h and skew the result.
+  const regionDayUtc = Date.UTC(p.year, p.month - 1, p.day);
+  const dayOfWeek = new Date(regionDayUtc).getUTCDay() || 7; // Mon=1 .. Sun=7
+  const thursday = regionDayUtc + (4 - dayOfWeek) * 86400000;
+  const thursdayYear = new Date(thursday).getUTCFullYear();
+  const yearStart = Date.UTC(thursdayYear, 0, 1);
+  const week = Math.ceil(((thursday - yearStart) / 86400000 + 1) / 7);
 
   // Day of year
-  const startOfYear = new Date(regionTime.getFullYear(), 0, 0);
-  const diff = regionDate.getTime() - startOfYear.getTime();
-  const dayOfYear = Math.floor(diff / 86400000);
+  const startOfYear = Date.UTC(p.year, 0, 0);
+  const dayOfYear = Math.round((regionDayUtc - startOfYear) / 86400000);
 
   // DST detection: compare current offset to January offset (standard time for northern hemisphere)
   // and July offset (standard time for southern hemisphere) — if current differs from both extremes' min, it's DST

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, memo } from "react";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 
 interface AuroraBackgroundProps {
   /** Hour of day (0-23) to control sun direction */
@@ -297,8 +298,7 @@ export const AuroraBackground = memo(function AuroraBackground({
     if (!gl) return null;
 
     // Compile shaders
-    const vs = gl.createShader(gl.VERTEX_SHADER)!;
-    gl.shaderSource(vs, VERTEX_SHADER);
+    const vs = gl.createShader(gl.VERTEX_SHADER)!;    gl.shaderSource(vs, VERTEX_SHADER);
     gl.compileShader(vs);
 
     const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
@@ -354,36 +354,45 @@ export const AuroraBackground = memo(function AuroraBackground({
     gl.uniform1f(uniforms.uCameraDistance, 3.5);
     gl.uniform1f(uniforms.uFov, 60.0);
 
-    return { gl, program, uniforms };
+    return { gl, program, uniforms, vs, fs, buffer };
   }, []);
+
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const result = initGL(canvas);
-    if (!result) return;
+    let disposed = false;
+    let resources: ReturnType<typeof initGL> = null;
 
-    const { gl, program, uniforms } = result;
-    glRef.current = gl;
-    programRef.current = program;
-    uniformsRef.current = uniforms;
-    startTimeRef.current = Date.now();
+    // Frees every GL object we created, not just the program. Shaders and the
+    // vertex buffer stay resident on the GPU otherwise.
+    const releaseResources = () => {
+      if (!resources) return;
+      const { gl, program, vs, fs, buffer } = resources;
+      gl.deleteProgram(program);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      gl.deleteBuffer(buffer);
+      resources = null;
+      glRef.current = null;
+      programRef.current = null;
+      uniformsRef.current = {};
+    };
 
-    let lastFrame = 0;
-    function render(t: number = performance.now()) {
-      // Throttle to ~30fps — atmospheric scattering shifts slowly enough
-      // that 60fps is wasted GPU/CPU on this background. Saves ~50% power.
-      const minFrameMs = 1000 / 30;
-      if (t - lastFrame < minFrameMs) {
-        rafRef.current = requestAnimationFrame(render);
-        return;
-      }
-      lastFrame = t;
+    const stop = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    };
 
+    function drawFrame(t: number) {
+      if (!resources) return;
+      const { gl, uniforms } = resources;
       const { hour: h, minuteFraction: mf, dark: d } = paramsRef.current;
       const params = getSceneParams(h, mf, d);
-      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      // Freeze the shader clock under reduced motion so the scene is a still image.
+      const elapsed = reducedMotion ? 0 : (t - startTimeRef.current) / 1000;
 
       // Resize canvas to match display
       const dpr = Math.min(window.devicePixelRatio, 1.5); // cap DPR for perf
@@ -407,30 +416,76 @@ export const AuroraBackground = memo(function AuroraBackground({
       gl.uniform1f(uniforms.uRotationSpeed, 0.08 + drift);
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    let lastFrame = 0;
+    function render(t: number = performance.now()) {
+      // Throttle to ~30fps — atmospheric scattering shifts slowly enough
+      // that 60fps is wasted GPU/CPU on this background. Saves ~50% power.
+      const minFrameMs = 1000 / 30;
+      if (t - lastFrame < minFrameMs) {
+        rafRef.current = requestAnimationFrame(render);
+        return;
+      }
+      lastFrame = t;
+      drawFrame(t);
       rafRef.current = requestAnimationFrame(render);
     }
 
-    rafRef.current = requestAnimationFrame(() => render());
+    const start = () => {
+      if (disposed || !resources) return;
+      if (reducedMotion) {
+        // One static frame, then no loop at all.
+        rafRef.current = requestAnimationFrame((t) => {
+          rafRef.current = 0;
+          drawFrame(t);
+        });
+        return;
+      }
+      if (!rafRef.current) rafRef.current = requestAnimationFrame(render);
+    };
+
+    const boot = () => {
+      resources = initGL(canvas);
+      if (!resources) return;
+      glRef.current = resources.gl;
+      programRef.current = resources.program;
+      uniformsRef.current = resources.uniforms;
+      startTimeRef.current = performance.now();
+      lastFrame = 0;
+      start();
+    };
+
+    boot();
+
+    // A GPU reset otherwise leaves the aurora permanently blank until remount.
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      stop();
+      resources = null;
+    };
+    const handleContextRestored = () => {
+      if (disposed) return;
+      boot();
+    };
+    canvas.addEventListener("webglcontextlost", handleContextLost);
+    canvas.addEventListener("webglcontextrestored", handleContextRestored);
 
     const handleVisibility = () => {
-      if (document.hidden) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = 0;
-      } else {
-        if (!rafRef.current) {
-          startTimeRef.current = Date.now() - (Date.now() - startTimeRef.current);
-          rafRef.current = requestAnimationFrame(() => render());
-        }
-      }
+      if (document.hidden) stop();
+      else start();
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      cancelAnimationFrame(rafRef.current);
+      disposed = true;
+      stop();
       document.removeEventListener("visibilitychange", handleVisibility);
-      gl.deleteProgram(program);
+      canvas.removeEventListener("webglcontextlost", handleContextLost);
+      canvas.removeEventListener("webglcontextrestored", handleContextRestored);
+      releaseResources();
     };
-  }, [initGL]);
+  }, [initGL, reducedMotion]);
 
   return (
     <canvas
