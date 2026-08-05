@@ -3,6 +3,11 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+# Must install devDependencies: globals.css does `@import "shadcn/tailwind.css"`,
+# and shadcn is a devDependency (it drags in hono/undici/ip-address, which have
+# no business in the runtime tree). Do NOT add --omit=dev or set
+# NODE_ENV=production here -- the Tailwind build in stage 2 would fail to
+# resolve that import. Only the stage 3 runner sets NODE_ENV=production.
 RUN npm ci
 
 # ── Stage 2: Build the Next.js app ────────────────────────────────

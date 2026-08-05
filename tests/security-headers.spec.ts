@@ -16,6 +16,9 @@ test("security headers present and no CSP violations at runtime", async ({ page 
   console.log("HSTS:", h["strict-transport-security"]);
   expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
   expect(h["content-security-policy"]).toContain("https://api.open-meteo.com");
+  // Neither React nor Next use eval in a production build, so shipping
+  // 'unsafe-eval' would weaken script-src for nothing. It is dev-only.
+  expect(h["content-security-policy"]).not.toContain("unsafe-eval");
   expect(h["strict-transport-security"]).toContain("max-age=63072000");
   expect(h["x-content-type-options"]).toBe("nosniff");
 

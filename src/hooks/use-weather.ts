@@ -72,6 +72,13 @@ export function useWeather(locations: LocationInput[]) {
   const [loading, setLoading] = useState(true);
   const [unit, setUnit] = useState<"C" | "F">("C");
   const fetchingRef = useRef(false);
+  // Mirrors committed weather so the fetch can merge against it without doing
+  // side effects inside a setState updater. saveCache() re-stamps the TTL, so
+  // it must not run on cache hydration -- only on a real fetch result.
+  const weatherRef = useRef<Record<string, WeatherData>>({});
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Stable identity for the location set — only changes when ids/coords actually change.
@@ -127,16 +134,17 @@ export function useWeather(locations: LocationInput[]) {
 
       // Keep only the locations this run was actually about, so removing a city
       // drops its reading instead of leaving it in state and the cache forever.
+      // Merged outside the state updater: updaters must be pure, and React can
+      // invoke them more than once (StrictMode, concurrent replay), which would
+      // otherwise persist a map that was never committed.
       const wanted = new Set(locations.map((loc) => loc.id));
-      setWeather((prev) => {
-        const merged: Record<string, WeatherData> = {};
-        for (const [id, value] of Object.entries(prev)) {
-          if (wanted.has(id)) merged[id] = value;
-        }
-        Object.assign(merged, results);
-        saveCache(merged);
-        return merged;
-      });
+      const merged: Record<string, WeatherData> = {};
+      for (const [id, value] of Object.entries(weatherRef.current)) {
+        if (wanted.has(id)) merged[id] = value;
+      }
+      Object.assign(merged, results);
+      setWeather(merged);
+      saveCache(merged);
       setLoading(false);
     } finally {
       fetchingRef.current = false;
