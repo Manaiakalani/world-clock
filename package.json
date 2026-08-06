@@ -1,7 +1,35 @@
 {
   "name": "world-clock",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "A privacy-first world clock for distributed teams: an interactive 3D globe, sky-coloured region cards, live weather, and a meeting planner.",
+  "keywords": [
+    "world-clock",
+    "timezone",
+    "timezone-converter",
+    "time-zones",
+    "meeting-planner",
+    "distributed-teams",
+    "remote-work",
+    "3d-globe",
+    "nextjs",
+    "react",
+    "pwa",
+    "privacy-first"
+  ],
+  "homepage": "https://github.com/Manaiakalani/world-clock#readme",
+  "bugs": {
+    "url": "https://github.com/Manaiakalani/world-clock/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Manaiakalani/world-clock.git"
+  },
+  "license": "MIT",
+  "author": "Manaiakalani",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

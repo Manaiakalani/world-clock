@@ -130,12 +130,16 @@
   }
 }
 
-/* Accessible focus indicators */
+/* Accessible focus indicators.
+   --ring is already a complete oklch() colour, so wrapping it in hsl() produced
+   an invalid value, which made the whole shorthand invalid at computed-value
+   time and dropped outline-style to `none` — leaving keyboard users with no
+   visible focus indicator at all on buttons, links and cards. */
 button:focus-visible,
 [role="button"]:focus-visible,
 input:focus-visible,
 a:focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useSyncExternalStore } from "react";
 import { X, Github, Keyboard, Shield } from "lucide-react";
 import { useModalDialog } from "@/hooks/use-modal-dialog";
 
@@ -9,9 +9,30 @@ interface AboutDialogProps {
   instant?: boolean;
 }
 
+// Platform never changes for the life of the page, so there is nothing to
+// subscribe to.
+const noopSubscribe = () => () => {};
+
+function getModifierKey(): string {
+  const platform =
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData
+      ?.platform ?? navigator.platform;
+  return /mac|iphone|ipad|ipod/i.test(platform ?? "") ? "⌘" : "Ctrl";
+}
+
+// The shortcut handlers accept metaKey *or* ctrlKey, so showing ⌘ to everyone
+// told Windows and Linux users to press a key their keyboard does not have.
+// useSyncExternalStore lets the server render a stable "Ctrl" and swap to the
+// real value on the client without a hydration mismatch.
+function useModifierKey(): string {
+  return useSyncExternalStore(noopSubscribe, getModifierKey, () => "Ctrl");
+}
+
 export function AboutDialog({ onClose, instant }: AboutDialogProps) {
   const titleId = useId();
   const dialogRef = useModalDialog<HTMLDivElement>(onClose);
+  const mod = useModifierKey();
+  const version = process.env.NEXT_PUBLIC_APP_VERSION;
 
   return (
     <>
@@ -49,11 +70,17 @@ export function AboutDialog({ onClose, instant }: AboutDialogProps) {
         {/* Content */}
         <div className="max-h-[60vh] overflow-y-auto">
           {/* About */}
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-5 py-4 border-b border-border space-y-3">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              A beautiful world clock to track teammates across the globe.
-              Features an interactive 3D globe, real-time weather data, sky-gradient
-              backgrounds, and a meeting planner for finding overlapping work hours.
+              Knowing what time it is for your teammates shouldn&apos;t take mental
+              arithmetic. World Clock puts every region on one screen, each card lit by
+              its own local sky — so you can tell at a glance who&apos;s mid-morning and
+              who&apos;s long asleep.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Spin the globe to find a city, check the live weather before you suggest a
+              walk-and-talk, scrub the time slider to look ahead, and let the meeting
+              planner surface the hours that actually work for everyone.
             </p>
           </div>
 
@@ -65,9 +92,10 @@ export function AboutDialog({ onClose, instant }: AboutDialogProps) {
             </h3>
             <div className="space-y-2 text-sm">
               {[
-                ["⌘K", "Quick search"],
-                ["⌘,", "Manage timezones"],
-                ["⌘M", "Meeting planner"],
+                [`${mod} K`, "Quick search"],
+                [`${mod} ,`, "Manage timezones"],
+                [`${mod} M`, "Meeting planner"],
+                [`${mod} T`, "Time travel"],
                 ["Esc", "Close panel"],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center justify-between">
@@ -87,11 +115,11 @@ export function AboutDialog({ onClose, instant }: AboutDialogProps) {
               Privacy
             </h3>
             <ul className="space-y-1.5 text-sm text-muted-foreground">
-              <li>• All data stored locally in your browser</li>
-              <li>• No user accounts or tracking</li>
-              <li>• Weather data from <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground transition-colors">Open-Meteo</a> (free, no API key)</li>
-              <li>• No cookies or analytics</li>
-              <li>• Open source — inspect the code yourself</li>
+              <li>• Your regions and settings never leave your browser</li>
+              <li>• No accounts, no sign-in, no server-side profile</li>
+              <li>• No cookies, no analytics, no third-party trackers</li>
+              <li>• Weather from <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground transition-colors">Open-Meteo</a> — the only network call this app makes</li>
+              <li>• MIT licensed and self-hostable — inspect or run it yourself</li>
             </ul>
           </div>
 
@@ -115,7 +143,7 @@ export function AboutDialog({ onClose, instant }: AboutDialogProps) {
 
         {/* Footer */}
         <div className="border-t border-border px-5 py-3 text-center text-[10px] text-muted-foreground">
-          Built with Next.js, COBE, shadcn/ui, and Open-Meteo
+          {version ? `Version ${version} · ` : ""}Built with Next.js, COBE, shadcn/ui, and Open-Meteo
         </div>
       </div>
     </>

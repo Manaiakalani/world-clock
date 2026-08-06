@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { version } from "./package.json";
 
 // Next and React do not use eval in production, so 'unsafe-eval' is only
 // needed for the dev overlay/HMR. Shipping it would weaken script-src for no
@@ -25,6 +26,12 @@ const CSP = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Surfaced in the About dialog. Injected here rather than importing
+  // package.json from a client component, which would pull the whole manifest
+  // (including devDependency names) into the browser bundle.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+  },
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
