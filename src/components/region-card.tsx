@@ -35,6 +35,15 @@ interface RegionCardProps {
   devMode?: boolean;
 }
 
+/**
+ * Darkens the sky gradient so white text stays legible at every hour.
+ *
+ * This rides in the card's own background rather than a positioned overlay: an
+ * `absolute inset-0` child resolves against the *padding* box, so it could never
+ * reach the 1px border, leaving that ring undimmed.
+ */
+const CARD_SCRIM = "linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.25))";
+
 /** Parse open-meteo's local ISO timestamp ("YYYY-MM-DDTHH:MM") into a fractional hour. */
 function localHourFromIso(iso: string | undefined): number | undefined {
   if (!iso) return undefined;
@@ -115,13 +124,18 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
                   ${isLocal ? "ring-1 ring-white/25" : ""}
                   ${isActive ? "ring-2 ring-white/30 shadow-lg" : ""}`}
       style={{
-        background: gradientToCSS(gradient),
+        // backgroundImage, not the `background` shorthand — the shorthand resets
+        // background-origin, and inline styles outrank utility classes, so it
+        // would silently undo the border-box origin below.
+        backgroundImage: `${CARD_SCRIM}, ${gradientToCSS(gradient)}`,
+        // Backgrounds paint to the border box but are *sized* to the padding box
+        // by default, so the gradient tiled and the 1px border showed the repeat
+        // — the bottom stop of the sky, its lightest colour, as a bright hairline
+        // across the top of every card. Sizing it to the border box removes it.
+        backgroundOrigin: "border-box",
         transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
       }}
     >
-      {/* Dark scrim for text readability across all sky gradients */}
-      <div className="absolute inset-0 bg-black/25 rounded-2xl" />
-
       {/* Collapsed row — always visible. Keeps the compact information density users know. */}
       <div className="relative z-10 flex items-center gap-2.5" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
         <span className="text-lg leading-none shrink-0" style={{ textShadow: "none" }}>{region.flag}</span>
