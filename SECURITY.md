@@ -72,9 +72,16 @@ These choices are deliberate and worth knowing before you file a report:
     per-request nonce. Adding a nonce would make browsers ignore
     `'unsafe-inline'` and break hydration.
   - `'unsafe-eval'` is only present in development, for the dev overlay and HMR.
-- **Dependencies are hash-locked.** `package-lock.json` is committed and CI and
-  the Docker build both use `npm ci`, so builds resolve to the exact same
-  artifacts. Dependabot watches npm, GitHub Actions, and Docker.
+- **Dependencies are pinned to exact versions** in `package.json`, and
+  `package-lock.json` is committed, so CI, Docker, and local installs all
+  resolve to identical artifacts. Dependabot watches npm, GitHub Actions, and
+  Docker so pinning does not turn into stale, unpatched versions.
+  - The `overrides` block deliberately keeps caret ranges. Those entries exist
+    to force a *minimum* patched version of a transitive package, so pinning
+    them exactly would block future security patches rather than guarantee them.
+  - Transitive packages still declare their own ranges inside the lockfile. That
+    is upstream metadata; the resolved tree is fixed by `package-lock.json` and
+    verified by its `integrity` hashes.
 - **CI actions are pinned to full commit SHAs**, so a compromised or retagged
   action release cannot silently enter the build.
 

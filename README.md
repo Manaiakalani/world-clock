@@ -250,8 +250,8 @@ pull request, and uploads the Playwright report as an artifact.
 
 Security headers (CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`,
 `Referrer-Policy`, `Permissions-Policy`) are set in `next.config.ts`. CI actions
-are pinned to full commit SHAs and dependencies are hash-locked via
-`package-lock.json`.
+are pinned to full commit SHAs, dependencies are pinned to exact versions and
+hash-locked via `package-lock.json`, and Dependabot keeps both current.
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md). Please do not open
 a public issue for security problems.
