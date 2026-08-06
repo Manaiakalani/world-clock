@@ -27,6 +27,20 @@ const FOCUS_SETTLE_RAD = 0.01;
 const SPIN_FADE_MS = 700;
 /** A dropped frame must not teleport the globe. */
 const MAX_FRAME_MS = 64;
+/** Dragging across the full width of the canvas turns the globe this far. */
+const DRAG_RAD_PER_WIDTH = 2;
+/**
+ * A release only throws the globe if the pointer was still moving this
+ * recently — pushing it somewhere and pausing before letting go should leave
+ * it where you put it.
+ */
+const FLING_SAMPLE_GAP_MS = 90;
+/** Weight of the newest sample in the running velocity estimate. */
+const FLING_SMOOTHING = 0.4;
+/** Ceiling on release speed, so a violent flick can't smear the globe. */
+const FLING_MAX_RAD_PER_MS = 0.01;
+/** Friction — a glide sheds 1/e of its speed every this many milliseconds. */
+const FLING_DECAY_MS = 500;
 
 export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, className, dark = true }: GlobeViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +52,11 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
   /** 0 = drift stopped, 1 = drift at full speed. Ramped, never snapped. */
   const spinRef = useRef(0);
   const pointerStartPhi = useRef(0);
+  /** Running estimate of drag speed (rad/ms) while the pointer is down. */
+  const dragVelocityRef = useRef(0);
+  const lastDragAt = useRef(0);
+  /** Speed the globe was thrown at, bled off by friction after release. */
+  const flingRef = useRef(0);
   const rafRef = useRef<number>(0);
   const widthRef = useRef(0);
   const regionsRef = useRef(regions);
@@ -57,6 +76,8 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
     if (region) {
       const lon = region.coordinates[1];
       targetPhiRef.current = (-lon * Math.PI) / 180 + Math.PI;
+      // A pending glide would fight the trip to the city.
+      flingRef.current = 0;
     }
   }, [focusRegionId, regions]);
 
@@ -140,11 +161,15 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
         const dt = lastFrame ? Math.min(now - lastFrame, MAX_FRAME_MS) : 0;
         lastFrame = now;
 
-        // Hold the drift while the globe is being read or dragged, and ease it
-        // back afterwards, so it never starts or stops with a jolt. It also
-        // ramps up from a standstill on first paint.
+        // Hold the drift while the globe is being read, dragged or still
+        // gliding, and ease it back afterwards, so it never starts or stops
+        // with a jolt. It also ramps up from a standstill on first paint.
+        const gliding = Math.abs(flingRef.current) > AUTO_ROTATE_RAD_PER_MS;
         const held =
-          pointerInteracting.current || pointerHovering.current || reducedMotionRef.current;
+          pointerInteracting.current ||
+          pointerHovering.current ||
+          reducedMotionRef.current ||
+          gliding;
         const targetSpin = held ? 0 : 1;
         const spinStep = dt / SPIN_FADE_MS;
         spinRef.current =
@@ -168,6 +193,17 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
               }
             }
           } else {
+            // Carry the throw, then let friction bleed it off. Once it has
+            // decayed to about drift speed the ramp above fades the ambient
+            // rotation back in, so the glide lands in the idle spin rather
+            // than stopping dead.
+            if (flingRef.current !== 0) {
+              phiRef.current += flingRef.current * dt;
+              flingRef.current *= Math.exp(-dt / FLING_DECAY_MS);
+              if (Math.abs(flingRef.current) < AUTO_ROTATE_RAD_PER_MS * 0.5) {
+                flingRef.current = 0;
+              }
+            }
             phiRef.current += AUTO_ROTATE_RAD_PER_MS * dt * spinRef.current;
           }
         }
@@ -227,6 +263,26 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dark]);
 
+  /**
+   * Release the globe. A flick hands its speed to the glide; a slow drag, or
+   * one that paused before letting go, hands over nothing and it stays put.
+   */
+  const endDrag = (throwIt: boolean) => {
+    if (!pointerInteracting.current) return;
+    pointerInteracting.current = false;
+
+    const restedFor = performance.now() - lastDragAt.current;
+    const velocity =
+      throwIt && !reducedMotionRef.current && restedFor <= FLING_SAMPLE_GAP_MS
+        ? dragVelocityRef.current
+        : 0;
+    flingRef.current = Math.max(
+      -FLING_MAX_RAD_PER_MS,
+      Math.min(FLING_MAX_RAD_PER_MS, velocity),
+    );
+    dragVelocityRef.current = 0;
+  };
+
   return (
     <div className={`relative aspect-square ${className ?? ""}`}>
       <canvas
@@ -235,6 +291,8 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
         aria-label="Interactive 3D globe showing teammate locations"
         data-testid="globe-canvas"
         className="h-full w-full cursor-grab active:cursor-grabbing"
+        // Horizontal drags belong to the globe; vertical ones still scroll the page.
+        style={{ touchAction: "pan-y" }}
         onPointerEnter={() => {
           // Reading a marker shouldn't be a moving target — hovering parks the
           // drift, and it eases back in once the pointer leaves.
@@ -247,6 +305,10 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
           pointerInteracting.current = true;
           pointerStartPhi.current =
             e.clientX / (canvasRef.current?.offsetWidth ?? 1);
+          // Grabbing a gliding globe stops it, the way catching a spun object does.
+          flingRef.current = 0;
+          dragVelocityRef.current = 0;
+          lastDragAt.current = performance.now();
           // Capture so a drag survives leaving the canvas instead of stalling
           // the moment the pointer crosses the edge.
           try {
@@ -255,32 +317,28 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
             // Pointer already released — the handlers below still end the drag.
           }
         }}
-        onPointerUp={() => {
-          pointerInteracting.current = false;
-        }}
-        onPointerCancel={() => {
-          pointerInteracting.current = false;
-        }}
-        onLostPointerCapture={() => {
-          pointerInteracting.current = false;
-        }}
+        onPointerUp={() => endDrag(true)}
+        onPointerCancel={() => endDrag(false)}
+        onLostPointerCapture={() => endDrag(true)}
         onPointerMove={(e) => {
-          if (pointerInteracting.current) {
-            const currentX =
-              e.clientX / (canvasRef.current?.offsetWidth ?? 1);
-            const delta = currentX - pointerStartPhi.current;
-            phiRef.current += delta * 2;
-            pointerStartPhi.current = currentX;
-          }
-        }}
-        onTouchMove={(e) => {
-          if (pointerInteracting.current && e.touches[0]) {
-            const currentX =
-              e.touches[0].clientX /
-              (canvasRef.current?.offsetWidth ?? 1);
-            const delta = currentX - pointerStartPhi.current;
-            phiRef.current += delta * 2;
-            pointerStartPhi.current = currentX;
+          if (!pointerInteracting.current) return;
+          const currentX = e.clientX / (canvasRef.current?.offsetWidth ?? 1);
+          const travelled = (currentX - pointerStartPhi.current) * DRAG_RAD_PER_WIDTH;
+          pointerStartPhi.current = currentX;
+          phiRef.current += travelled;
+
+          // Track how fast the pointer is actually moving, so the release can
+          // tell a flick from a slow reposition.
+          const now = performance.now();
+          const elapsed = now - lastDragAt.current;
+          lastDragAt.current = now;
+          if (elapsed > FLING_SAMPLE_GAP_MS) {
+            // The pointer was resting; start the estimate over rather than
+            // averaging across the pause.
+            dragVelocityRef.current = 0;
+          } else if (elapsed > 0) {
+            dragVelocityRef.current +=
+              (travelled / elapsed - dragVelocityRef.current) * FLING_SMOOTHING;
           }
         }}
       />
