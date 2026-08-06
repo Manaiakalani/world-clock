@@ -17,6 +17,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so the
+# public origin has to be supplied here rather than at container start. It feeds
+# canonical URLs, robots.txt, sitemap.xml and .well-known/security.txt.
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

@@ -1,0 +1,19 @@
+# Code owners for World Clock.
+#
+# Listed owners are requested for review automatically on every pull request
+# that touches a matching path. Combine this with a branch protection rule that
+# requires code owner review to make the check binding.
+
+# Default owner for everything in the repository.
+*                       @Manaiakalani
+
+# Build, deployment, and supply chain. Changes here affect every consumer.
+/.github/               @Manaiakalani
+/Dockerfile             @Manaiakalani
+/docker-compose.yml     @Manaiakalani
+/next.config.ts         @Manaiakalani
+/package.json           @Manaiakalani
+/package-lock.json      @Manaiakalani
+
+# Security posture and disclosure policy.
+/SECURITY.md            @Manaiakalani

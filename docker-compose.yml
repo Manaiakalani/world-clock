@@ -1,6 +1,12 @@
 services:
   world-clock:
-    build: .
+    build:
+      context: .
+      args:
+        # Set NEXT_PUBLIC_SITE_URL in a .env file next to this compose file to
+        # advertise your real public origin to crawlers. Defaults to the local
+        # port so a bare `docker compose up` still works.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3009}
     container_name: world-clock
     restart: unless-stopped
     ports:

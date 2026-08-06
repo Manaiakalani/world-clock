@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # npm dependencies. Grouped so routine patch churn arrives as one PR instead
+  # of a dozen, while majors stay separate for deliberate review.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      types:
+        patterns:
+          - "@types/*"
+
+  # Workflow actions are pinned to SHAs, so this is the mechanism that keeps
+  # them current. Without it, pinning would quietly rot into stale versions.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

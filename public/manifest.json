@@ -1,8 +1,10 @@
 {
-  "name": "World Clock",
+  "name": "World Clock — Global Timezone Tracker",
   "short_name": "World Clock",
-  "description": "Track teammates across the globe with an interactive 3D globe and analog clock.",
+  "description": "Track teammates across time zones with an interactive 3D globe, live local weather, and a meeting planner. No account, no tracking.",
   "start_url": "/",
+  "lang": "en",
+  "dir": "ltr",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
