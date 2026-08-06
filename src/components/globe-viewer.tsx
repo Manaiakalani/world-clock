@@ -12,12 +12,31 @@ interface GlobeViewerProps {
   dark?: boolean;
 }
 
+/**
+ * One full revolution every 90 seconds — roughly a third of the old speed.
+ * The previous loop advanced phi by a fixed amount per *frame*, so the globe
+ * also span twice as fast on a 120 Hz display as on a 60 Hz one. Driving it
+ * from elapsed time makes the pace identical everywhere.
+ */
+const AUTO_ROTATE_RAD_PER_MS = (2 * Math.PI) / 90_000;
+/** Exponential approach toward a focused city, per millisecond. */
+const FOCUS_EASE_PER_MS = 0.005;
+/** Close enough to the focused city to hand control back to the drift. */
+const FOCUS_SETTLE_RAD = 0.01;
+/** How long the drift takes to fade out when grabbed, and back in when released. */
+const SPIN_FADE_MS = 700;
+/** A dropped frame must not teleport the globe. */
+const MAX_FRAME_MS = 64;
+
 export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, className, dark = true }: GlobeViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const globeRef = useRef<Globe | null>(null);
   const phiRef = useRef(0);
   const targetPhiRef = useRef<number | null>(null);
   const pointerInteracting = useRef(false);
+  const pointerHovering = useRef(false);
+  /** 0 = drift stopped, 1 = drift at full speed. Ramped, never snapped. */
+  const spinRef = useRef(0);
   const pointerStartPhi = useRef(0);
   const rafRef = useRef<number>(0);
   const widthRef = useRef(0);
@@ -114,8 +133,25 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
 
       // Throttled resize check — only read offsetWidth every 60 frames
       let frameCount = 0;
+      let lastFrame = 0;
 
-      function animate() {
+      function animate(now: number) {
+        // First frame after a start or a resume has no meaningful delta.
+        const dt = lastFrame ? Math.min(now - lastFrame, MAX_FRAME_MS) : 0;
+        lastFrame = now;
+
+        // Hold the drift while the globe is being read or dragged, and ease it
+        // back afterwards, so it never starts or stops with a jolt. It also
+        // ramps up from a standstill on first paint.
+        const held =
+          pointerInteracting.current || pointerHovering.current || reducedMotionRef.current;
+        const targetSpin = held ? 0 : 1;
+        const spinStep = dt / SPIN_FADE_MS;
+        spinRef.current =
+          targetSpin > spinRef.current
+            ? Math.min(targetSpin, spinRef.current + spinStep)
+            : Math.max(targetSpin, spinRef.current - spinStep);
+
         if (!pointerInteracting.current) {
           if (targetPhiRef.current !== null) {
             const diff = targetPhiRef.current - phiRef.current;
@@ -126,13 +162,13 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
               phiRef.current = targetPhiRef.current;
               targetPhiRef.current = null;
             } else {
-              phiRef.current += normalizedDiff * 0.08;
-              if (Math.abs(normalizedDiff) < 0.01) {
+              phiRef.current += normalizedDiff * (1 - Math.exp(-FOCUS_EASE_PER_MS * dt));
+              if (Math.abs(normalizedDiff) < FOCUS_SETTLE_RAD) {
                 targetPhiRef.current = null;
               }
             }
-          } else if (!reducedMotionRef.current) {
-            phiRef.current += 0.003;
+          } else {
+            phiRef.current += AUTO_ROTATE_RAD_PER_MS * dt * spinRef.current;
           }
         }
 
@@ -172,6 +208,9 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
           rafRef.current = 0;
         } else {
           if (!rafRef.current) {
+            // Drop the stale timestamp so the globe resumes where it stopped
+            // rather than jumping forward by the time the tab was away.
+            lastFrame = 0;
             rafRef.current = requestAnimationFrame(animate);
           }
         }
@@ -196,15 +235,33 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
         aria-label="Interactive 3D globe showing teammate locations"
         data-testid="globe-canvas"
         className="h-full w-full cursor-grab active:cursor-grabbing"
+        onPointerEnter={() => {
+          // Reading a marker shouldn't be a moving target — hovering parks the
+          // drift, and it eases back in once the pointer leaves.
+          pointerHovering.current = true;
+        }}
+        onPointerLeave={() => {
+          pointerHovering.current = false;
+        }}
         onPointerDown={(e) => {
           pointerInteracting.current = true;
           pointerStartPhi.current =
             e.clientX / (canvasRef.current?.offsetWidth ?? 1);
+          // Capture so a drag survives leaving the canvas instead of stalling
+          // the moment the pointer crosses the edge.
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // Pointer already released — the handlers below still end the drag.
+          }
         }}
         onPointerUp={() => {
           pointerInteracting.current = false;
         }}
-        onPointerOut={() => {
+        onPointerCancel={() => {
+          pointerInteracting.current = false;
+        }}
+        onLostPointerCapture={() => {
           pointerInteracting.current = false;
         }}
         onPointerMove={(e) => {

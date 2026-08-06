@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, memo, useEffect, useRef } from "react";
+import { useMemo, memo, useEffect, useRef, useState } from "react";
 import { Region } from "@/data/regions";
 import { useMinute } from "@/hooks/use-clock";
+import { secondStore } from "@/lib/clock-store";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import {
   getRegionHour,
   getRegionMinute,
@@ -11,10 +13,58 @@ import {
   getTimezoneAbbr,
 } from "@/lib/timezone-utils";
 
+const DEGREES_PER_SECOND = 6;
+/** Length of the escapement-style settle after each one-second step. */
+const SECOND_TICK_MS = 140;
+/** Snap forward, overshoot a hair, then settle — the motion a real hand makes. */
+const SECOND_TICK_EASING = "cubic-bezier(0.34, 1.8, 0.55, 1)";
+/** The minute and hour hands move far less often, so they settle more slowly. */
+const MINUTE_SETTLE_MS = 320;
+/**
+ * Timers are allowed to fire a fraction of a millisecond early. Reading the
+ * clock slightly ahead of the boundary keeps the hand off the second that has
+ * just ended without being perceptible.
+ */
+const TICK_EPSILON_MS = 25;
+
 // Round to 2 decimal places to prevent SSR/client hydration mismatches
 // from floating-point precision differences between Node.js and the browser
 function r(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Drive one clock hand straight through the DOM.
+ *
+ * Keeping the hands off React's update path means the rendered `transform`
+ * never changes, which matters for more than performance: a hand whose angle
+ * is re-derived on every tick rewinds a whole turn when it passes 12
+ * (59 → 0 minutes reads as a 354° sweep backwards). Unwrapping against the
+ * last applied angle keeps every move short and in the direction the hand is
+ * actually travelling.
+ */
+function useHand(angle: number, transition: string) {
+  const ref = useRef<SVGLineElement | null>(null);
+  const applied = useRef(angle);
+  const primed = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    let next = angle;
+    while (next < applied.current - 180) next += 360;
+    while (next > applied.current + 180) next -= 360;
+
+    // The first placement reconciles whatever the server rendered with the
+    // browser's real clock — that correction should land, not sweep.
+    el.style.transition = primed.current ? transition : "";
+    el.setAttribute("transform", `rotate(${r(next)}, 100, 100)`);
+    applied.current = next;
+    primed.current = true;
+  }, [angle, transition]);
+
+  return ref;
 }
 
 interface AnalogClockProps {
@@ -176,66 +226,85 @@ export const AnalogClock = memo(function AnalogClock({
   onRegionClick,
 }: AnalogClockProps) {
   // Subscribe only to minute precision — hour/minute hands and cluster layout
-  // never need sub-minute updates. The smooth second hand below mutates the
-  // DOM directly via rAF so it never triggers React reconciliation.
+  // never need sub-minute updates. The second hand below steps once per second
+  // straight through the DOM, so it never triggers React reconciliation.
   const rawNow = useMinute();
   const now = useMemo(
     () => (timeOffset === 0 ? rawNow : new Date(rawNow.getTime() + timeOffset * 3600000)),
     [rawNow, timeOffset],
   );
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const localHour = getRegionHour(localTimezone, now);
   const localMinute = getRegionMinute(localTimezone, now);
 
-  // Clock hand angles. The second hand starts at the minute-start position;
-  // the rAF effect below sweeps it from there.
-  const minuteAngle = localMinute * 6;
-  const hourAngle = (localHour % 12) * 30 + localMinute * 0.5;
+  // Every hand shares one motion language: a step, then a short settle. Reduced
+  // motion keeps the steps and drops the settle.
+  const settle = prefersReducedMotion
+    ? ""
+    : `transform ${SECOND_TICK_MS}ms ${SECOND_TICK_EASING}`;
+  const minuteSettle = prefersReducedMotion
+    ? ""
+    : `transform ${MINUTE_SETTLE_MS}ms ${SECOND_TICK_EASING}`;
 
-  // Direct-DOM second hand: avoids re-rendering the whole clock 60×/min.
+  const hourHandRef = useHand((localHour % 12) * 30 + localMinute * 0.5, minuteSettle);
+  const minuteHandRef = useHand(localMinute * 6, minuteSettle);
+
+  // The hands are positioned from effects, so the markup carries only the angle
+  // at first render — enough for the server to draw a correct clock, and frozen
+  // afterwards so React never fights the effect for the attribute.
+  const [initialHands] = useState(() => ({
+    hour: `rotate(${r((localHour % 12) * 30 + localMinute * 0.5)}, 100, 100)`,
+    minute: `rotate(${r(localMinute * 6)}, 100, 100)`,
+  }));
+
+  // Second hand: a deadbeat tick, not a continuous sweep.
+  //
+  // A smooth 60 fps sweep never lets the hand rest, so there is no rhythm to
+  // read the dial against and the clock feels like it is racing even though it
+  // is keeping perfect time. One crisp step per second with a short settle
+  // reads as calm and deliberate — and it costs one DOM write a second instead
+  // of sixty, off the shared drift-free second store rather than its own rAF
+  // loop (which also means it pauses with the rest of the clock in a hidden
+  // tab).
   const secondHandRef = useRef<SVGLineElement | null>(null);
   useEffect(() => {
     const el = secondHandRef.current;
     if (!el) return;
 
-    // Respect prefers-reduced-motion: snap to current second, no animation loop.
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion) {
-      const s = Math.floor(((Date.now() + timeOffset * 3600000) / 1000) % 60);
-      el.setAttribute("transform", `rotate(${s * 6}, 100, 100)`);
-      return;
-    }
+    const offsetMs = timeOffset * 3600000;
+    const currentSecond = () =>
+      Math.floor((Date.now() + offsetMs + TICK_EPSILON_MS) / 1000) % 60;
 
-    let raf = 0;
+    // Reduced motion still ticks — it just lands without the settle.
+    let angle = currentSecond() * DEGREES_PER_SECOND;
+    const paint = (next: number, animated: boolean) => {
+      el.style.transition = animated ? settle : "";
+      el.setAttribute("transform", `rotate(${next}, 100, 100)`);
+      angle = next;
+    };
+    paint(angle, false);
+
     const tick = () => {
-      const t = Date.now() + timeOffset * 3600000;
-      const seconds = (t / 1000) % 60;
-      el.setAttribute("transform", `rotate(${seconds * 6}, 100, 100)`);
-      raf = requestAnimationFrame(tick);
-    };
-    const start = () => {
-      if (!raf) raf = requestAnimationFrame(tick);
-    };
-    const stop = () => {
-      if (raf) {
-        cancelAnimationFrame(raf);
-        raf = 0;
+      // Fold a completed revolution away. rotate(360) and rotate(0) render
+      // identically, so an untransitioned reset is invisible — but it has to be
+      // flushed, or the browser coalesces it with the step below and animates
+      // the long way round.
+      if (angle >= 360) {
+        paint(angle - 360, false);
+        el.getBoundingClientRect();
       }
-    };
-    const onVisibility = () => {
-      if (document.hidden) stop();
-      else start();
+
+      let next = currentSecond() * DEGREES_PER_SECOND;
+      while (next < angle) next += 360;
+      // Animate an ordinary one-second step; anything larger (a tab catching up
+      // after being hidden, a system clock change) snaps, so the hand is never
+      // seen scrubbing to catch the truth.
+      paint(next, next - angle === DEGREES_PER_SECOND);
     };
 
-    if (typeof document === "undefined" || !document.hidden) start();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      stop();
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [timeOffset]);
+    return secondStore.subscribe(tick);
+  }, [timeOffset, settle]);
 
   // Region positions only need minute precision — re-runs only when minute or regions change.
   const clusters = useMemo(
@@ -250,27 +319,29 @@ export const AnalogClock = memo(function AnalogClock({
 
         {/* Hour hand — thick and tapered */}
         <line
+          ref={hourHandRef}
           x1="100" y1="100" x2="100" y2="58"
           className="stroke-foreground"
           strokeWidth="3.5"
           strokeLinecap="round"
-          transform={`rotate(${r(hourAngle)}, 100, 100)`}
-          style={{ transition: "transform 0.3s ease", willChange: "transform" }}
+          transform={initialHands.hour}
+          style={{ willChange: "transform" }}
           suppressHydrationWarning
         />
 
-        {/* Minute hand */}
+        {/* Minute hand — steps once a minute with the same settle as the seconds */}
         <line
+          ref={minuteHandRef}
           x1="100" y1="100" x2="100" y2="38"
           className="stroke-foreground"
           strokeWidth="2"
           strokeLinecap="round"
-          transform={`rotate(${r(minuteAngle)}, 100, 100)`}
-          style={{ transition: "transform 0.1s ease", willChange: "transform" }}
+          transform={initialHands.minute}
+          style={{ willChange: "transform" }}
           suppressHydrationWarning
         />
 
-        {/* Second hand — rotated via direct DOM mutation from a rAF loop (no React re-renders) */}
+        {/* Second hand — stepped once a second by direct DOM mutation (no React re-renders) */}
         <line
           ref={secondHandRef}
           x1="100" y1="106" x2="100" y2="34"
