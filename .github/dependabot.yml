@@ -23,6 +23,12 @@ updates:
     schedule:
       interval: weekly
 
+  # Dependabot proposes whatever Node tag is newest, which is often a "Current"
+  # release rather than an LTS one. This repo runs LTS only, so a major bump is
+  # merged only once that line has actually entered LTS -- check
+  # https://github.com/nodejs/Release/blob/main/schedule.json before accepting.
+  # Keep .github/workflows/ci.yml's node-version in step with the Dockerfile;
+  # CI should test the runtime we actually ship.
   - package-ecosystem: docker
     directory: /
     schedule:
