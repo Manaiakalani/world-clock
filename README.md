@@ -17,6 +17,8 @@ surface the hours that actually work for everyone.
 
 No account. No tracking. No cookies. Self-hostable in one command.
 
+![World Clock: a dotted globe and sky-colored region cards](docs/screenshots/desktop.png)
+
 ---
 
 ## Highlights
