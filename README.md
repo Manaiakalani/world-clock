@@ -40,32 +40,32 @@ No account. No tracking. No cookies. Self-hostable in one command.
 
 ### Motion & Interaction
 
-Motion here is tuned to be calm rather than busy — this is an app people leave
+Motion here is tuned to be calm rather than busy: this is an app people leave
 open all day.
 
-- **Deadbeat second hand** — the second hand ticks once per second like a quartz
+- **Deadbeat second hand**: the second hand ticks once per second like a quartz
   movement instead of sweeping at 60fps. Calmer to sit beside, and dramatically
   cheaper to render.
-- **Time-based globe rotation** — one revolution every 90 seconds, driven by
+- **Time-based globe rotation**: one revolution every 90 seconds, driven by
   elapsed time rather than frame count, so the speed is identical on a 60Hz
   laptop and a 144Hz monitor.
-- **Momentum on drag** — flick the globe and it glides on, decaying naturally;
+- **Momentum on drag**: flick the globe and it glides on, decaying naturally;
   drag it slowly and it stops where you let go. Velocity is smoothed over the
   last few pointer samples, so a flick-then-pause correctly means "stop".
   Grabbing a spinning globe stops it dead.
-- **Reduced motion respected** — `prefers-reduced-motion` drops the animated
+- **Reduced motion respected**: `prefers-reduced-motion` drops the animated
   backgrounds and transitions throughout.
 
 ### UX & Design
 
-- 🌓 **Dark / Light mode** — smooth CSS transition, respects OS preference
-- 🎨 **Aurora background** — WebGL atmospheric scattering shader (pauses when tab hidden)
-- 🏳️ **Country flags** — emoji flags on cards, clock, and globe
-- 📱 **Responsive** — mobile, tablet (with globe), and desktop layouts
-- ⌨️ **Keyboard shortcuts** — platform-aware, showing ⌘ on macOS and Ctrl elsewhere
-- ♿ **Accessible** — visible focus rings on every control, skip-to-content, aria-live clock, screen reader labels
-- 📲 **Installable** — web app manifest with icons, theme colour and standalone display (no offline service worker)
-- 🔒 **Privacy-first** — all data in localStorage, no cookies, no tracking, no accounts
+- 🌓 **Dark / Light mode**: smooth CSS transition, respects OS preference
+- 🎨 **Aurora background**: WebGL atmospheric scattering shader (pauses when tab hidden)
+- 🏳️ **Country flags**: emoji flags on cards, clock, and globe
+- 📱 **Responsive**: mobile, tablet (with globe), and desktop layouts
+- ⌨️ **Keyboard shortcuts**: platform-aware, showing ⌘ on macOS and Ctrl elsewhere
+- ♿ **Accessible**: visible focus rings on every control, skip-to-content, aria-live clock, screen reader labels
+- 📲 **Installable**: web app manifest with icons, theme colour and standalone display (no offline service worker)
+- 🔒 **Privacy-first**: all data in localStorage, no cookies, no tracking, no accounts
 
 ---
 
@@ -141,7 +141,7 @@ echo "NEXT_PUBLIC_SITE_URL=https://clock.example.com" > .env
 docker compose up -d --build
 ```
 
-Leaving it unset is harmless for private or LAN deployments — you simply get
+Leaving it unset is harmless for private or LAN deployments: you simply get
 localhost URLs in metadata that nothing is crawling anyway.
 
 ---
@@ -176,10 +176,10 @@ everywhere, and the About dialog labels them for your platform automatically.
 
 | Key | Action |
 | --- | --- |
-| `⌘K` / `Ctrl K` | Quick search — add/remove timezones |
+| `⌘K` / `Ctrl K` | Quick search: add/remove timezones |
 | `⌘,` / `Ctrl ,` | Manage timezones |
 | `⌘M` / `Ctrl M` | Meeting planner |
-| `⌘T` / `Ctrl T` | Time travel — toggle the time slider |
+| `⌘T` / `Ctrl T` | Time travel: toggle the time slider |
 | `Esc` | Close panel |
 
 ---
@@ -191,7 +191,7 @@ world-clock/
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx              # Root layout, fonts, metadata, JSON-LD, viewport
-│   │   ├── page.tsx                # Main orchestrator — all hooks + UI
+│   │   ├── page.tsx                # Main orchestrator: all hooks + UI
 │   │   ├── globals.css             # Tailwind + animations + themes
 │   │   ├── icon.tsx                # Generated favicon
 │   │   ├── apple-icon.tsx          # Generated Apple touch icon
@@ -277,7 +277,7 @@ CI runs the same checks, so a green local run should mean a green PR.
 
 ## Privacy
 
-World Clock runs entirely in your browser. **No tracking, no telemetry, no cookies, no analytics, no accounts.** Timezone preferences and weather cache are stored in localStorage. Weather data is fetched from [Open-Meteo](https://open-meteo.com) (free, open-source API — no API key required).
+World Clock runs entirely in your browser. **No tracking, no telemetry, no cookies, no analytics, no accounts.** Timezone preferences and weather cache are stored in localStorage. Weather data is fetched from [Open-Meteo](https://open-meteo.com) (free, open-source API: no API key required).
 
 ## License
 
