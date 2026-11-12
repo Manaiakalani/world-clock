@@ -8,7 +8,7 @@ interface HeaderProps {
 
 export const Header = memo(function Header({ now }: HeaderProps) {
   return (
-    <header className="flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-white/5">
+    <header className="flex shrink-0 items-center justify-between border-b border-white/5 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:pb-4 sm:pt-[max(1rem,env(safe-area-inset-top))]">
       <div className="flex items-center gap-3">
         <div
           className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-xl

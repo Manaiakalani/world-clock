@@ -1,6 +1,6 @@
 {
   "name": "world-clock",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "A privacy-first world clock for distributed teams: an interactive 3D globe, sky-coloured region cards, live weather, and a meeting planner.",
   "keywords": [

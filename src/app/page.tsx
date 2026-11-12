@@ -9,16 +9,50 @@ import { useTimeFormat } from "@/hooks/use-time-format";
 import { useWeather } from "@/hooks/use-weather";
 import { regionsFromTimezones } from "@/data/regions";
 import { canonicalToKnownId } from "@/data/timezone-aliases";
-import { GlobeViewer } from "@/components/globe-viewer";
 import { AnalogClock } from "@/components/analog-clock";
 import { RegionList } from "@/components/region-list";
 import { AuroraBackground } from "@/components/aurora-background";
 import { Header } from "@/components/header";
+import { MobileActionBar } from "@/components/mobile-action-bar";
 import { getRegionHour, getRegionMinute } from "@/lib/timezone-utils";
 import { useCustomOrder } from "@/hooks/use-custom-order";
 import { useDevMode } from "@/hooks/use-dev-mode";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { Switch } from "@/components/ui/switch";
-import { Clock, List, Settings2, Moon, Sun, Link2, Check, Calendar, Info, MoreHorizontal, Search, ArrowUpDown } from "lucide-react";
+import { Clock, List, Settings2, Moon, Sun, Link2, Check, Calendar, Info, ArrowUpDown } from "lucide-react";
+
+// COBE is a large WebGL chunk. Load it only once a viewport actually shows the globe.
+const GlobeViewer = dynamic(
+  () => import("@/components/globe-viewer").then((m) => m.GlobeViewer),
+  { ssr: false },
+);
+
+const TOOLBAR_BUTTON =
+  "relative flex h-8 w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1 bg-background/50 text-xs font-bold transition-[transform,background-color] duration-[160ms] ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-accent active:scale-[0.95]";
+
+function ToolbarButton({
+  label,
+  onClick,
+  pressed,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  pressed?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={pressed}
+      className={pressed ? `${TOOLBAR_BUTTON} bg-accent/80` : TOOLBAR_BUTTON}
+    >
+      {children}
+    </button>
+  );
+}
 
 // Modal/conditional surfaces — lazy-loaded so they don't ship in the initial bundle.
 const TimezoneManager = dynamic(
@@ -81,12 +115,15 @@ export default function WorldClockPage() {
   const [showMeetingPlanner, setShowMeetingPlanner] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
-  const [showOverflow, setShowOverflow] = useState(false);
   const [showTimeSlider, setShowTimeSlider] = useState(false);
+  // Matches the `md` breakpoint. Below it the globe column is display:none,
+  // but mounting it anyway still downloaded COBE and spun a WebGL context.
+  const showGlobe = useMediaQuery("(min-width: 768px)");
   const [timeOffset, setTimeOffset] = useState(0);
 
-  // Track whether the last open was triggered by keyboard (skip enter animations)
-  const openedViaKeyboard = useRef(false);
+  // Skip the enter animation when a shortcut opened the surface. State, not a
+  // ref, so the value is safe to read while rendering.
+  const [openedViaKeyboard, setOpenedViaKeyboard] = useState(false);
 
   // Time travel: shift all minute-precision clocks.
   const adjustedMinute = useMemo(
@@ -144,7 +181,9 @@ export default function WorldClockPage() {
 
   // Use ref for regions so handleReorder doesn't recreate when regions change
   const regionsRef = useRef(regions);
-  regionsRef.current = regions;
+  useEffect(() => {
+    regionsRef.current = regions;
+  }, [regions]);
 
   const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
     // Persist place ids, not resolved timezones — reordering used to rewrite
@@ -168,17 +207,17 @@ export default function WorldClockPage() {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        openedViaKeyboard.current = true;
+        setOpenedViaKeyboard(true);
         setShowQuickSearch((prev) => !prev);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
-        openedViaKeyboard.current = true;
+        setOpenedViaKeyboard(true);
         setShowManager((prev) => !prev);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "m") {
         e.preventDefault();
-        openedViaKeyboard.current = true;
+        setOpenedViaKeyboard(true);
         setShowMeetingPlanner((prev) => !prev);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "t") {
@@ -210,7 +249,7 @@ export default function WorldClockPage() {
   if (!loaded) return null;
 
   return (
-    <div className="relative h-screen overflow-hidden">
+    <div className="app-viewport relative h-screen overflow-hidden">
       {/* Atmospheric scattering background — inspired by motion-core/halo */}
       <div className="absolute inset-0">
         <AuroraBackground hour={localHour} minuteFraction={minuteFraction} dark={theme === "dark"} />
@@ -249,15 +288,16 @@ export default function WorldClockPage() {
             showManager || showMeetingPlanner ? "pb-3" : "pb-20 xl:pb-3"
           }`}
         >
-          {/* Globe — left side (hidden on mobile, visible from lg up) */}
-          <div className="hidden md:flex flex-1 items-center justify-center min-h-0">
-            <GlobeViewer
-              regions={regions}
-              focusRegionId={activeRegionId}
-              dark={theme === "dark"}
-              className="w-full max-w-[320px] lg:max-w-[680px] xl:max-w-[720px] 2xl:max-w-[800px]"
-            />
-          </div>
+          {showGlobe && (
+            <div className="hidden md:flex flex-1 items-center justify-center min-h-0">
+              <GlobeViewer
+                regions={regions}
+                focusRegionId={activeRegionId}
+                dark={theme === "dark"}
+                className="w-full max-w-[320px] lg:max-w-[680px] xl:max-w-[720px] 2xl:max-w-[800px]"
+              />
+            </div>
+          )}
 
           {/* Right panel — fixed width on desktop, fills on mobile */}
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:flex-initial md:w-[340px] lg:w-[420px] md:shrink-0 xl:w-[460px]">
@@ -266,7 +306,7 @@ export default function WorldClockPage() {
                 regions={regions}
                 now={adjustedMinute}
                 onClose={() => setShowMeetingPlanner(false)}
-                instant={openedViaKeyboard.current}
+                instant={openedViaKeyboard}
               />
             ) : showManager ? (
               /* Timezone Manager view */
@@ -277,7 +317,7 @@ export default function WorldClockPage() {
                 onSetTimezones={setTimezones}
                 onClose={() => setShowManager(false)}
                 is24h={is24h}
-                instant={openedViaKeyboard.current}
+                instant={openedViaKeyboard}
               />
             ) : (
               /* Main view: clock + region cards */
@@ -303,93 +343,54 @@ export default function WorldClockPage() {
                     </div>
                     {/* Desktop / tablet icon row — hidden on phones in favor of the bottom action bar */}
                     <div className="hidden xl:flex items-center gap-2 border-l border-border/60 pl-3">
-                    <button
-                      onClick={toggleTimeFormat}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1
-                                 bg-background/50 transition-[transform,background-color] duration-160
-                                 hover:bg-accent active:scale-[0.95] text-[10px] sm:text-xs font-bold"
-                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-                      aria-label="Toggle time format"
-                    >
+                    <ToolbarButton label="Toggle time format" onClick={toggleTimeFormat}>
                       {is24h ? "24" : "12"}
-                    </button>
-                    <button
-                      onClick={() => { openedViaKeyboard.current = false; setShowManager(true); setShowMeetingPlanner(false); }}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1
-                                 bg-background/50 transition-[transform,background-color] duration-160
-                                 hover:bg-accent active:scale-[0.95]"
-                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-                      aria-label="Manage timezones"
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Manage timezones"
+                      onClick={() => { setOpenedViaKeyboard(false); setShowManager(true); setShowMeetingPlanner(false); }}
                     >
-                      <Settings2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </button>
-                    <button
-                      onClick={() => { openedViaKeyboard.current = false; setShowMeetingPlanner(true); setShowManager(false); }}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1
-                                 bg-background/50 transition-[transform,background-color] duration-160
-                                 hover:bg-accent active:scale-[0.95]"
-                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-                      aria-label="Meeting planner"
+                      <Settings2 className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Meeting planner"
+                      onClick={() => { setOpenedViaKeyboard(false); setShowMeetingPlanner(true); setShowManager(false); }}
                     >
-                      <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </button>
-                    <button
-                      onClick={handleShare}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1
-                                 bg-background/50 transition-[transform,background-color] duration-160
-                                 hover:bg-accent active:scale-[0.95]"
-                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-                      aria-label="Copy shareable link"
-                    >
+                      <Calendar className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton label="Copy shareable link" onClick={handleShare}>
                       {copied ? (
-                        <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
+                        <Check className="h-4 w-4 text-green-500" />
                       ) : (
-                        <Link2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <Link2 className="h-4 w-4" />
                       )}
-                    </button>
-                    <button
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Toggle theme"
                       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1
-                                 bg-background/50 transition-[transform,background-color] duration-160
-                                 hover:bg-accent active:scale-[0.95]"
-                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-                      aria-label="Toggle theme"
                     >
-                      {theme === "dark" ? (
-                        <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      ) : (
-                        <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => { openedViaKeyboard.current = false; setShowAbout(true); }}
-                      className="relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1
-                                 bg-background/50 transition-[transform,background-color] duration-160
-                                 hover:bg-accent active:scale-[0.95]"
-                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-                      aria-label="About World Clock"
+                      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="About World Clock"
+                      onClick={() => { setOpenedViaKeyboard(false); setShowAbout(true); }}
                     >
-                      <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </button>
-                    <button
+                      <Info className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label={customOrder ? "Sort by time" : "Custom order (drag to reorder)"}
+                      pressed={customOrder}
                       onClick={toggleCustomOrder}
-                      className={`relative flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border border-border after:absolute after:content-[''] after:-inset-y-2 after:-inset-x-1
-                                 transition-[transform,background-color] duration-160
-                                 hover:bg-accent active:scale-[0.95]
-                                 ${customOrder ? "bg-accent/80" : "bg-background/50"}`}
-                      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-                      aria-label={customOrder ? "Sort by time" : "Custom order (drag to reorder)"}
-                      title={customOrder ? "Sort by time" : "Custom order"}
                     >
-                      <ArrowUpDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </button>
+                      <ArrowUpDown className="h-4 w-4" />
+                    </ToolbarButton>
                     </div>
                   </div>
                 </div>
 
                 {/* Analog clock — self-ticking at 1s internally */}
                 {showClock && (
-                  <div className="mx-auto w-full max-w-[160px] shrink-0 sm:max-w-[220px] xl:max-w-[200px] 2xl:max-w-[240px]">
+                  <div className="mx-auto w-full max-w-[min(160px,30dvh)] shrink-0 sm:max-w-[220px] xl:max-w-[200px] 2xl:max-w-[240px]">
                     <AnalogClock
                       regions={regions}
                       timeOffset={timeOffset}
@@ -426,7 +427,7 @@ export default function WorldClockPage() {
       </div>
 
       {/* About dialog */}
-      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} instant={openedViaKeyboard.current} />}
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} instant={openedViaKeyboard} />}
 
       {/* Quick search modal */}
       {showQuickSearch && (
@@ -436,136 +437,27 @@ export default function WorldClockPage() {
           onToggle={toggle}
           onClose={() => setShowQuickSearch(false)}
           is24h={is24h}
-          instant={openedViaKeyboard.current}
+          instant={openedViaKeyboard}
         />
       )}
 
-      {/* Mobile bottom action bar — hidden on sm+ where the icon row in the panel header is shown.
-          Stays out of the way of the panel sub-views (manager / planner) which provide their own back affordance. */}
       {!showManager && !showMeetingPlanner && (
-        <nav
-          aria-label="Primary actions"
-          className="xl:hidden fixed inset-x-0 bottom-0 z-30 border-t border-border
-                     bg-background/85
-                     pb-[env(safe-area-inset-bottom)]"
-        >
-          <div className="flex items-center justify-around px-2 py-1.5">
-            <button
-              onClick={() => { openedViaKeyboard.current = false; setShowQuickSearch(true); }}
-              className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
-                         text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
-                         transition-transform duration-160"
-              style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-              aria-label="Quick search"
-            >
-              <Search className="h-5 w-5" />
-              <span className="leading-none">Search</span>
-            </button>
-            <button
-              onClick={() => { openedViaKeyboard.current = false; setShowManager(true); setShowOverflow(false); }}
-              className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
-                         text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
-                         transition-transform duration-160"
-              style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-              aria-label="Manage timezones"
-            >
-              <Settings2 className="h-5 w-5" />
-              <span className="leading-none">Manage</span>
-            </button>
-            <button
-              onClick={() => { openedViaKeyboard.current = false; setShowMeetingPlanner(true); setShowOverflow(false); }}
-              className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
-                         text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
-                         transition-transform duration-160"
-              style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-              aria-label="Meeting planner"
-            >
-              <Calendar className="h-5 w-5" />
-              <span className="leading-none">Plan</span>
-            </button>
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
-                         text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
-                         transition-transform duration-160"
-              style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              <span className="leading-none">Theme</span>
-            </button>
-            <button
-              onClick={() => setShowOverflow((v) => !v)}
-              aria-expanded={showOverflow}
-              aria-label="More actions"
-              className="flex h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg
-                         text-[10px] text-muted-foreground active:scale-[0.95] active:bg-accent/50
-                         transition-transform duration-160"
-              style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
-            >
-              <MoreHorizontal className="h-5 w-5" />
-              <span className="leading-none">More</span>
-            </button>
-          </div>
-
-          {/* Overflow popover — anchored above the bar */}
-          {showOverflow && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowOverflow(false)}
-                aria-hidden="true"
-              />
-              <div
-                role="menu"
-                className="overflow-menu-enter absolute right-2 bottom-[calc(100%+8px)] z-20 w-44 rounded-xl border border-border
-                           bg-popover/95 shadow-lg overflow-hidden"
-                style={{ transformOrigin: "bottom right" }}
-              >
-                <button
-                  role="menuitem"
-                  onClick={() => { toggleTimeFormat(); setShowOverflow(false); }}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-accent active:bg-accent"
-                >
-                  <span>Time format</span>
-                  <span className="font-mono text-xs font-bold text-muted-foreground">{is24h ? "24h" : "12h"}</span>
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { setShowClock((v) => !v); setShowOverflow(false); }}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-accent active:bg-accent"
-                >
-                  <span>{showClock ? "Hide clock" : "Show clock"}</span>
-                  {showClock ? <Clock className="h-4 w-4 text-muted-foreground" /> : <List className="h-4 w-4 text-muted-foreground" />}
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { handleShare(); setShowOverflow(false); }}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-accent active:bg-accent"
-                >
-                  <span>Share link</span>
-                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Link2 className="h-4 w-4 text-muted-foreground" />}
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { toggleCustomOrder(); setShowOverflow(false); }}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-accent active:bg-accent"
-                >
-                  <span>{customOrder ? "Sort by time" : "Custom order"}</span>
-                  <span className="text-[10px] font-medium text-muted-foreground">{customOrder ? "drag" : "UTC"}</span>
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { openedViaKeyboard.current = false; setShowAbout(true); setShowOverflow(false); }}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-accent active:bg-accent"
-                >
-                  <span>About</span>
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
-            </>
-          )}
-        </nav>
+        <MobileActionBar
+          is24h={is24h}
+          showClock={showClock}
+          customOrder={customOrder}
+          copied={copied}
+          dark={theme === "dark"}
+          onSearch={() => { setOpenedViaKeyboard(false); setShowQuickSearch(true); }}
+          onManage={() => { setOpenedViaKeyboard(false); setShowManager(true); }}
+          onPlan={() => { setOpenedViaKeyboard(false); setShowMeetingPlanner(true); }}
+          onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+          onToggleTimeFormat={toggleTimeFormat}
+          onToggleClock={() => setShowClock((v) => !v)}
+          onShare={handleShare}
+          onToggleCustomOrder={toggleCustomOrder}
+          onAbout={() => { setOpenedViaKeyboard(false); setShowAbout(true); }}
+        />
       )}
     </div>
   );

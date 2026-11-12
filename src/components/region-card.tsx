@@ -141,8 +141,8 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
         <span className="text-lg leading-none shrink-0" style={{ textShadow: "none" }}>{region.flag}</span>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[13px] sm:text-sm font-semibold leading-tight tracking-tight text-white">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-[13px] sm:text-sm font-semibold leading-tight tracking-tight text-white">
               {region.city}
             </span>
             <span className="text-[10px] leading-none shrink-0" style={{ textShadow: "none" }}>
@@ -152,19 +152,19 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
               <span className="h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] sm:text-[11px] leading-tight text-white/70">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-[10px] sm:text-[11px] leading-tight text-white/70">
               {region.name} · {tzAbbr}
             </span>
             {weather ? (
-              <span className="text-[10px] sm:text-[11px] leading-tight font-medium text-white/80">
+              <span className="shrink-0 text-[10px] sm:text-[11px] leading-tight font-medium text-white/80">
                 {weather.emoji} {Math.round(weather.temperatureC)}°/{weather.temperatureF}°
               </span>
             ) : (
-              <span className="inline-block w-12 h-3 rounded bg-white/10 weather-shimmer" />
+              <span className="inline-block w-12 h-3 shrink-0 rounded bg-white/10 weather-shimmer" />
             )}
             {dstTransition && (
-              <span className={`text-[10px] leading-tight ${dstTransition.daysUntil >= 0 ? "text-amber-300/90" : "text-white/50"}`}>
+              <span className={`hidden shrink-0 sm:inline text-[10px] leading-tight ${dstTransition.daysUntil >= 0 ? "text-amber-300/90" : "text-white/50"}`}>
                 ⏰ DST {dstTransition.daysUntil >= 0
                   ? dstTransition.daysUntil === 0 ? "today" : `in ${dstTransition.daysUntil}d`
                   : `${Math.abs(dstTransition.daysUntil)}d ago`}
@@ -247,6 +247,13 @@ export const RegionCard = memo(function RegionCard({ region, now, onClick, isAct
               <div className="mt-2 text-[10px] text-white/50 font-mono">
                 {region.timezone}
               </div>
+              {dstTransition && (
+                <div className={`mt-1 text-[10px] sm:hidden ${dstTransition.daysUntil >= 0 ? "text-amber-300/90" : "text-white/50"}`}>
+                  ⏰ DST {dstTransition.daysUntil >= 0
+                    ? dstTransition.daysUntil === 0 ? "today" : `in ${dstTransition.daysUntil}d`
+                    : `${Math.abs(dstTransition.daysUntil)}d ago`}
+                </div>
+              )}
               {devInfo && (
                 <div className="mt-1.5 pt-1.5 border-t border-white/10 font-mono text-[9px] sm:text-[10px] text-white/50 space-y-0.5">
                   <div>ISO&nbsp; {devInfo.iso}</div>

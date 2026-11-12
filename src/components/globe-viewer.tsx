@@ -41,6 +41,23 @@ const FLING_SMOOTHING = 0.4;
 const FLING_MAX_RAD_PER_MS = 0.01;
 /** Friction — a glide sheds 1/e of its speed every this many milliseconds. */
 const FLING_DECAY_MS = 500;
+/**
+ * Idle drift is a 90s revolution. 30fps is indistinguishable from 60 there,
+ * and it halves the fill rate while the globe is just sitting.
+ */
+const IDLE_FRAME_MS = 1000 / 30;
+
+function markerKey(list: { id: string; color: [number, number, number] }[]): string {
+  let key = "";
+  for (const region of list) {
+    key += region.id;
+    key += region.color[0];
+    key += region.color[1];
+    key += region.color[2];
+    key += ";";
+  }
+  return key;
+}
 
 export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, className, dark = true }: GlobeViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -81,17 +98,16 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
     }
   }, [focusRegionId, regions]);
 
-  // Initialize globe — only runs when regions array reference changes
+  // Recreate only when the theme changes. Marker colours stream in through refs.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     let cancelled = false;
+    let booting = false;
     let globe: Globe | null = null;
     let handleVisibility: (() => void) | null = null;
-
-    const arcs = generateArcs(regions);
-    widthRef.current = canvas.offsetWidth;
+    let resizeObserver: ResizeObserver | null = null;
 
     // Theme-aware globe palette
     const config = dark
@@ -116,151 +132,191 @@ export const GlobeViewer = memo(function GlobeViewer({ regions, focusRegionId, c
           mapBaseBrightness: 0.1,
         };
 
-    import("cobe").then(({ default: createGlobe }) => {
-      if (cancelled) return;
+    // COBE sets canvas.width = width * devicePixelRatio on every update that
+    // includes width. Passing CSS*2 here used to stack on top of that dpr and
+    // reallocate a 4× buffer every frame. Width is CSS pixels; dpr is separate.
+    const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
 
-      globe = createGlobe(canvas, {
-        devicePixelRatio: Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio : 1),
-        width: widthRef.current * 2,
-        height: widthRef.current * 2,
-        phi: phiRef.current,
-        theta: 0.15,
-        dark: config.dark,
-        diffuse: config.diffuse,
-        mapSamples: 20000,
-        mapBrightness: config.mapBrightness,
-        mapBaseBrightness: config.mapBaseBrightness,
-        baseColor: config.baseColor,
-        markerColor: config.markerColor,
-        glowColor: config.glowColor,
-        markers: regions.map((r) => ({
-          location: r.coordinates,
-          size: 0.08,
-          color: r.color,
-          id: r.id,
-        })),
-        arcs: arcs.map((arc) => ({
-          from: arc.from,
-          to: arc.to,
-        })),
-        arcColor: config.arcColor,
-        arcWidth: 0.4,
-        arcHeight: 0.3,
-        scale: 1.05,
-        opacity: 1,
-      });
+    const boot = () => {
+      if (cancelled || globe || booting) return;
+      const css = canvas.offsetWidth;
+      if (css < 2) return;
+      booting = true;
+      widthRef.current = css;
 
-      globeRef.current = globe;
+      const initialRegions = regionsRef.current;
+      const arcs = generateArcs(initialRegions);
 
-      // Throttled resize check — only read offsetWidth every 60 frames
-      let frameCount = 0;
-      let lastFrame = 0;
+      import("cobe").then(({ default: createGlobe }) => {
+        if (cancelled) return;
 
-      function animate(now: number) {
-        // First frame after a start or a resume has no meaningful delta.
-        const dt = lastFrame ? Math.min(now - lastFrame, MAX_FRAME_MS) : 0;
-        lastFrame = now;
-
-        // Hold the drift while the globe is being read, dragged or still
-        // gliding, and ease it back afterwards, so it never starts or stops
-        // with a jolt. It also ramps up from a standstill on first paint.
-        const gliding = Math.abs(flingRef.current) > AUTO_ROTATE_RAD_PER_MS;
-        const held =
-          pointerInteracting.current ||
-          pointerHovering.current ||
-          reducedMotionRef.current ||
-          gliding;
-        const targetSpin = held ? 0 : 1;
-        const spinStep = dt / SPIN_FADE_MS;
-        spinRef.current =
-          targetSpin > spinRef.current
-            ? Math.min(targetSpin, spinRef.current + spinStep)
-            : Math.max(targetSpin, spinRef.current - spinStep);
-
-        if (!pointerInteracting.current) {
-          if (targetPhiRef.current !== null) {
-            const diff = targetPhiRef.current - phiRef.current;
-            const normalizedDiff =
-              ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
-            if (reducedMotionRef.current) {
-              // Jump straight to the target instead of easing toward it.
-              phiRef.current = targetPhiRef.current;
-              targetPhiRef.current = null;
-            } else {
-              phiRef.current += normalizedDiff * (1 - Math.exp(-FOCUS_EASE_PER_MS * dt));
-              if (Math.abs(normalizedDiff) < FOCUS_SETTLE_RAD) {
-                targetPhiRef.current = null;
-              }
-            }
-          } else {
-            // Carry the throw, then let friction bleed it off. Once it has
-            // decayed to about drift speed the ramp above fades the ambient
-            // rotation back in, so the glide lands in the idle spin rather
-            // than stopping dead.
-            if (flingRef.current !== 0) {
-              phiRef.current += flingRef.current * dt;
-              flingRef.current *= Math.exp(-dt / FLING_DECAY_MS);
-              if (Math.abs(flingRef.current) < AUTO_ROTATE_RAD_PER_MS * 0.5) {
-                flingRef.current = 0;
-              }
-            }
-            phiRef.current += AUTO_ROTATE_RAD_PER_MS * dt * spinRef.current;
-          }
-        }
-
-        // Only check for resize every 60 frames (~1s at 60fps)
-        frameCount++;
-        if (frameCount % 60 === 0) {
-          const newWidth = canvas!.offsetWidth;
-          if (newWidth !== widthRef.current) {
-            widthRef.current = newWidth;
-          }
-        }
-
-        globe!.update({
+        globe = createGlobe(canvas, {
+          devicePixelRatio: pixelRatio,
+          width: css,
+          height: css,
           phi: phiRef.current,
-          width: widthRef.current * 2,
-          height: widthRef.current * 2,
-          markers: regionsRef.current.map((r) => ({
+          theta: 0.15,
+          dark: config.dark,
+          diffuse: config.diffuse,
+          mapSamples: css < 480 ? 12000 : 20000,
+          mapBrightness: config.mapBrightness,
+          mapBaseBrightness: config.mapBaseBrightness,
+          baseColor: config.baseColor,
+          markerColor: config.markerColor,
+          glowColor: config.glowColor,
+          markers: initialRegions.map((r) => ({
             location: r.coordinates,
             size: 0.08,
             color: r.color,
             id: r.id,
           })),
-          arcs: arcsRef.current.map((arc) => ({
+          arcs: arcs.map((arc) => ({
             from: arc.from,
             to: arc.to,
           })),
+          arcColor: config.arcColor,
+          arcWidth: 0.4,
+          arcHeight: 0.3,
+          scale: 1.05,
+          opacity: 1,
         });
 
+        globeRef.current = globe;
+
+        let lastFrame = 0;
+        let lastDraw = 0;
+        let appliedCss = css;
+        let appliedKey = markerKey(initialRegions);
+
+        function animate(now: number) {
+          // First frame after a start or a resume has no meaningful delta.
+          const dt = lastFrame ? Math.min(now - lastFrame, MAX_FRAME_MS) : 0;
+          lastFrame = now;
+
+          // Hold the drift while the globe is being read, dragged or still
+          // gliding, and ease it back afterwards, so it never starts or stops
+          // with a jolt. It also ramps up from a standstill on first paint.
+          const gliding = Math.abs(flingRef.current) > AUTO_ROTATE_RAD_PER_MS;
+          const held =
+            pointerInteracting.current ||
+            pointerHovering.current ||
+            reducedMotionRef.current ||
+            gliding;
+          const targetSpin = held ? 0 : 1;
+          const spinStep = dt / SPIN_FADE_MS;
+          spinRef.current =
+            targetSpin > spinRef.current
+              ? Math.min(targetSpin, spinRef.current + spinStep)
+              : Math.max(targetSpin, spinRef.current - spinStep);
+
+          if (!pointerInteracting.current) {
+            if (targetPhiRef.current !== null) {
+              const diff = targetPhiRef.current - phiRef.current;
+              const normalizedDiff =
+                ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
+              if (reducedMotionRef.current) {
+                // Jump straight to the target instead of easing toward it.
+                phiRef.current = targetPhiRef.current;
+                targetPhiRef.current = null;
+              } else {
+                phiRef.current += normalizedDiff * (1 - Math.exp(-FOCUS_EASE_PER_MS * dt));
+                if (Math.abs(normalizedDiff) < FOCUS_SETTLE_RAD) {
+                  targetPhiRef.current = null;
+                }
+              }
+            } else {
+              // Carry the throw, then let friction bleed it off. Once it has
+              // decayed to about drift speed the ramp above fades the ambient
+              // rotation back in, so the glide lands in the idle spin rather
+              // than stopping dead.
+              if (flingRef.current !== 0) {
+                phiRef.current += flingRef.current * dt;
+                flingRef.current *= Math.exp(-dt / FLING_DECAY_MS);
+                if (Math.abs(flingRef.current) < AUTO_ROTATE_RAD_PER_MS * 0.5) {
+                  flingRef.current = 0;
+                }
+              }
+              phiRef.current += AUTO_ROTATE_RAD_PER_MS * dt * spinRef.current;
+            }
+          }
+
+          const lively =
+            pointerInteracting.current ||
+            targetPhiRef.current !== null ||
+            Math.abs(flingRef.current) > AUTO_ROTATE_RAD_PER_MS;
+          const viewCss = widthRef.current;
+          if (viewCss < 2 || (!lively && now - lastDraw < IDLE_FRAME_MS)) {
+            rafRef.current = requestAnimationFrame(animate);
+            return;
+          }
+          lastDraw = now;
+
+          const current = regionsRef.current;
+          const key = markerKey(current);
+          const patch: {
+            phi: number;
+            width?: number;
+            height?: number;
+            markers?: { location: [number, number]; size: number; color: [number, number, number]; id: string }[];
+            arcs?: { from: [number, number]; to: [number, number] }[];
+          } = { phi: phiRef.current };
+          // Only include width when it changed. COBE assigns canvas.width on
+          // every update that carries it, which clears the drawing buffer.
+          if (viewCss !== appliedCss) {
+            appliedCss = viewCss;
+            patch.width = viewCss;
+            patch.height = viewCss;
+          }
+          if (key !== appliedKey) {
+            appliedKey = key;
+            patch.markers = current.map((r) => ({
+              location: r.coordinates,
+              size: 0.08,
+              color: r.color,
+              id: r.id,
+            }));
+            patch.arcs = arcsRef.current.map((arc) => ({
+              from: arc.from,
+              to: arc.to,
+            }));
+          }
+
+          globe!.update(patch);
+          rafRef.current = requestAnimationFrame(animate);
+        }
+
         rafRef.current = requestAnimationFrame(animate);
-      }
 
-      rafRef.current = requestAnimationFrame(animate);
-
-      handleVisibility = () => {
-        if (document.hidden) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = 0;
-        } else {
-          if (!rafRef.current) {
+        handleVisibility = () => {
+          if (document.hidden) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = 0;
+          } else if (!rafRef.current) {
             // Drop the stale timestamp so the globe resumes where it stopped
             // rather than jumping forward by the time the tab was away.
             lastFrame = 0;
             rafRef.current = requestAnimationFrame(animate);
           }
-        }
-      };
-      document.addEventListener("visibilitychange", handleVisibility);
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+      });
+    };
+
+    resizeObserver = new ResizeObserver(() => {
+      widthRef.current = canvas.offsetWidth;
+      if (!globe) boot();
     });
+    resizeObserver.observe(canvas);
+    boot();
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
+      resizeObserver?.disconnect();
       if (handleVisibility) document.removeEventListener("visibilitychange", handleVisibility);
       if (globe) globe.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Theme is the only reason to rebuild the GL context. Regions update live.
   }, [dark]);
 
   /**

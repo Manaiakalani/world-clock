@@ -13,6 +13,31 @@ interface AuroraBackgroundProps {
   className?: string;
 }
 
+/**
+ * The sky is a low-frequency gradient behind the UI. Drawing it at retina
+ * resolution, 30 times a second, dominates a phone GPU. Cap the buffer and
+ * let the canvas element scale it back up.
+ */
+function auroraBuffer(cssW: number, cssH: number): { w: number; h: number; frameMs: number } {
+  const mobile = cssW < 768;
+  // 1× CSS pixels. The sky is smooth, and a retina buffer was mostly wasted
+  // fill rate behind the cards. Phones are capped further on the long edge.
+  let w = Math.max(1, cssW);
+  let h = Math.max(1, cssH);
+  const maxEdge = mobile ? 512 : 1600;
+  const edge = Math.max(w, h);
+  if (edge > maxEdge) {
+    const scale = maxEdge / edge;
+    w *= scale;
+    h *= scale;
+  }
+  return {
+    w: Math.max(1, Math.round(w)),
+    h: Math.max(1, Math.round(h)),
+    frameMs: mobile ? 1000 / 20 : 1000 / 30,
+  };
+}
+
 const VERTEX_SHADER = `
   attribute vec2 aPosition;
   varying vec2 vUv;
@@ -394,10 +419,9 @@ export const AuroraBackground = memo(function AuroraBackground({
       // Freeze the shader clock under reduced motion so the scene is a still image.
       const elapsed = reducedMotion ? 0 : (t - startTimeRef.current) / 1000;
 
-      // Resize canvas to match display
-      const dpr = Math.min(window.devicePixelRatio, 1.5); // cap DPR for perf
-      const w = canvas!.clientWidth * dpr;
-      const h2 = canvas!.clientHeight * dpr;
+      const buffer = auroraBuffer(canvas!.clientWidth, canvas!.clientHeight);
+      const w = buffer.w;
+      const h2 = buffer.h;
       if (canvas!.width !== w || canvas!.height !== h2) {
         canvas!.width = w;
         canvas!.height = h2;
@@ -420,9 +444,8 @@ export const AuroraBackground = memo(function AuroraBackground({
 
     let lastFrame = 0;
     function render(t: number = performance.now()) {
-      // Throttle to ~30fps — atmospheric scattering shifts slowly enough
-      // that 60fps is wasted GPU/CPU on this background. Saves ~50% power.
-      const minFrameMs = 1000 / 30;
+      const cssW = canvas!.clientWidth;
+      const minFrameMs = auroraBuffer(cssW, canvas!.clientHeight).frameMs;
       if (t - lastFrame < minFrameMs) {
         rafRef.current = requestAnimationFrame(render);
         return;

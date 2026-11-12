@@ -88,12 +88,18 @@ export function useWeather(locations: LocationInput[]) {
     .map((l) => `${l.id}:${l.coordinates[0]},${l.coordinates[1]}`)
     .join("|");
 
-  // Load saved unit preference
+  // localStorage is unavailable during SSR. Read it after mount, but not
+  // synchronously inside the effect — that retriggers a render in the same
+  // turn the linter (and React) treat as a cascading update.
   useEffect(() => {
+    let saved: string | null = null;
     try {
-      const saved = localStorage.getItem(STORAGE_UNIT_KEY);
-      if (saved === "F" || saved === "C") setUnit(saved);
+      saved = localStorage.getItem(STORAGE_UNIT_KEY);
     } catch {}
+    if (saved !== "F" && saved !== "C") return;
+    const next = saved;
+    const id = requestAnimationFrame(() => setUnit(next));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   const toggleUnit = useCallback(() => {
@@ -157,9 +163,13 @@ export function useWeather(locations: LocationInput[]) {
   useEffect(() => {
     const controller = new AbortController();
     const cached = loadCache();
+    let hydrateFrame = 0;
     if (cached) {
-      setWeather(cached.data);
-      setLoading(false);
+      const data = cached.data;
+      hydrateFrame = requestAnimationFrame(() => {
+        setWeather(data);
+        setLoading(false);
+      });
     }
 
     type IdleWindow = Window & {
@@ -175,6 +185,7 @@ export function useWeather(locations: LocationInput[]) {
     }
     return () => {
       controller.abort();
+      if (hydrateFrame) cancelAnimationFrame(hydrateFrame);
       if (typeof handle === "number" && typeof w.cancelIdleCallback === "function") {
         w.cancelIdleCallback(handle);
       } else {
