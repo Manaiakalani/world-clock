@@ -169,12 +169,12 @@ export function QuickSearch({ now, isActive, onToggle, onClose, is24h, instant }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search timezones..."
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground md:text-sm"
           />
           <button
             onClick={onClose}
             aria-label="Close search"
-            className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>

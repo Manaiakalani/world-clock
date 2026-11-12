@@ -91,7 +91,7 @@ export function TimezoneManager({
       <div className="flex shrink-0 items-center gap-2 pb-3">
         <button
           onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-border
                      bg-background/50 transition-colors hover:bg-accent"
           aria-label="Back"
         >

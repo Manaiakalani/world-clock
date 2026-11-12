@@ -1,6 +1,6 @@
 # World Clock
 
-[![Version](https://img.shields.io/badge/version-1.0.0-0ea5e9.svg)](https://github.com/Manaiakalani/world-clock/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-0ea5e9.svg)](https://github.com/Manaiakalani/world-clock/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/Manaiakalani/world-clock/actions/workflows/ci.yml/badge.svg)](https://github.com/Manaiakalani/world-clock/actions/workflows/ci.yml)
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)

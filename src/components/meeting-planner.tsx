@@ -91,18 +91,24 @@ export function MeetingPlanner({ regions, now, onClose, instant }: MeetingPlanne
         </span>
       </div>
 
-      {/* Time grid */}
-      <div className="min-h-0 flex-1 overflow-y-auto" role="grid" aria-label="Meeting planner showing working hour overlaps">
+      {/* Time grid. Cells keep a readable width and the row scrolls sideways
+          on a phone instead of collapsing 24 hours into an 8px crumb. */}
+      <div
+        className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-x-contain"
+        role="grid"
+        aria-label="Meeting planner showing working hour overlaps"
+      >
+        <div className="w-max min-w-full sm:w-full">
         {/* Hour labels row — viewer-local time for each slot */}
         <div className="flex items-end gap-px mb-1" role="row">
-          <div className="w-[88px] sm:w-[100px] shrink-0" role="columnheader" aria-label="Region" />
+          <div className="sticky left-0 z-10 w-[88px] sm:w-[100px] shrink-0 bg-popover/95" role="columnheader" aria-label="Region" />
           {slots.map((slot, i) => {
             const displayHour = slot.getHours();
             return (
               <div
                 key={i}
                 role="columnheader"
-                className={`flex-1 text-center text-[8px] sm:text-[9px] tabular-nums ${
+                className={`w-5 shrink-0 sm:w-auto sm:min-w-0 sm:flex-1 text-center text-[10px] tabular-nums ${
                   i === currentSlot ? "font-bold text-foreground" : "text-muted-foreground/60"
                 }`}
               >
@@ -118,7 +124,7 @@ export function MeetingPlanner({ regions, now, onClose, instant }: MeetingPlanne
             {/* Region label */}
             <div
               role="rowheader"
-              className="w-[88px] sm:w-[100px] shrink-0 flex items-center gap-1.5 pr-2"
+              className="sticky left-0 z-10 w-[88px] sm:w-[100px] shrink-0 flex items-center gap-1.5 pr-2 bg-popover/95"
             >
               <span className="text-xs leading-none">{region.flag}</span>
               <span className="text-[10px] sm:text-[11px] font-medium truncate">{region.city}</span>
@@ -133,7 +139,7 @@ export function MeetingPlanner({ regions, now, onClose, instant }: MeetingPlanne
                   key={i}
                   role="gridcell"
                   aria-label={`${label}${cell.working ? ", working hours" : ""}${isOverlap ? ", overlap" : ""}`}
-                  className={`flex-1 h-6 sm:h-7 rounded-[2px] transition-colors ${
+                  className={`w-5 h-7 shrink-0 sm:w-auto sm:min-w-0 sm:flex-1 rounded-[2px] transition-colors ${
                     isOverlap
                       ? "bg-emerald-400 dark:bg-emerald-500"
                       : cell.working
@@ -146,6 +152,7 @@ export function MeetingPlanner({ regions, now, onClose, instant }: MeetingPlanne
             })}
           </div>
         ))}
+        </div>
       </div>
     </div>
   );

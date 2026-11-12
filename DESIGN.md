@@ -606,11 +606,17 @@ The design enforces these contracts:
 
 ## Responsive Behavior
 
-- **`< md` (mobile, single column):** globe hidden; right panel becomes
-  full-width; analog clock takes the visual lead; icon buttons shrink from
-  32px to 28px; gaps compress to 6px.
+- **`< md` (mobile, single column):** globe is not mounted, so phones never
+  download the WebGL globe; right panel becomes full-width; analog clock
+  takes the visual lead and shrinks in short landscape; the bottom action
+  bar is the control surface (44px targets, home-indicator inset); the
+  meeting-planner hour grid scrolls sideways instead of crushing cells;
+  gaps compress to 6px. The shell height is `100dvh` so browser chrome
+  does not cover the bar. The aurora draws into a capped buffer (512px on
+  the long edge, 20fps) and is scaled up.
 - **`md` (tablet, two-column):** globe appears at ~320px max width; right
-  panel locks to 340px.
+  panel locks to 340px. The bottom bar stays until `xl`, where the header
+  icon row fits.
 - **`lg`–`xl` (laptop / desktop):** globe scales up to 680–720px; right
   panel grows to 420–460px; card gaps relax back to 8px.
 - **`2xl`+ (large desktop):** globe peaks at 800px; cards gain extra
