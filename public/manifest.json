@@ -2,7 +2,7 @@
   "name": "World Clock — Global Timezone Tracker",
   "short_name": "World Clock",
   "description": "Track teammates across time zones with an interactive 3D globe, live local weather, and a meeting planner. No account, no tracking.",
-  "start_url": "/",
+  "start_url": "./",
   "lang": "en",
   "dir": "ltr",
   "display": "standalone",
@@ -11,12 +11,12 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/icon",
+      "src": "./icon",
       "sizes": "32x32",
       "type": "image/png"
     },
     {
-      "src": "/apple-icon",
+      "src": "./apple-icon",
       "sizes": "180x180",
       "type": "image/png"
     }

@@ -7,6 +7,14 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.2-black?logo=next.js)](https://nextjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 
+<p align="center">
+  <a href="https://manaiakalani.github.io/world-clock/"><strong>Live demo</strong></a>
+  &nbsp;&middot;&nbsp;
+  <a href="#getting-started">Getting started</a>
+  &nbsp;&middot;&nbsp;
+  <a href="#docker">Docker</a>
+</p>
+
 Knowing what time it is for your teammates shouldn't take mental arithmetic.
 
 **World Clock** puts every region on one screen, each card lit by its own local
@@ -131,6 +139,7 @@ public origin advertised to crawlers and social previews:
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | `http://localhost:3009` | Origin used for `metadataBase`, the canonical link, Open Graph URLs, `robots.txt`, `sitemap.xml`, and `.well-known/security.txt` |
 | `PORT` | `3009` | Host port published by `docker-compose.yml` |
+| `GITHUB_PAGES` | unset | Set to `true` at build time to emit a static export with `basePath` `/world-clock` for GitHub Pages. Leave unset for Docker and `next start`. |
 
 `NEXT_PUBLIC_*` values are inlined into the client bundle at build time, so
 `NEXT_PUBLIC_SITE_URL` must be set **when you build**, not when the container
@@ -223,6 +232,7 @@ world-clock/
 ├── public/                         # Web app manifest and static assets
 ├── .github/
 │   ├── workflows/ci.yml            # Lint, typecheck, build, Playwright
+│   ├── workflows/pages.yml         # Static export to GitHub Pages
 │   ├── dependabot.yml              # npm, Actions and Docker updates
 │   └── CODEOWNERS                  # Review routing
 ├── Dockerfile                      # Multi-stage production build

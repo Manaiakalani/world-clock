@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/site";
 
+export const dynamic = "force-static";
+
 /**
  * Generated rather than served from public/robots.txt so the sitemap URL always
  * matches the deployment's real origin instead of a hardcoded placeholder.

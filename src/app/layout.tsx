@@ -5,6 +5,13 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
+// File-convention icons and public/manifest.json are not prefixed by Next
+// when using Turbopack + `output: "export"`. Spell the GitHub Pages subpath
+// on that build only, so the demo does not request `/icon` and
+// `/manifest.json` from the github.io root. The standalone build keeps
+// Next's own hashed file-convention icon URLs.
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
+
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -43,7 +50,15 @@ export const metadata: Metadata = {
   creator: siteConfig.author,
   publisher: siteConfig.author,
   category: "productivity",
-  manifest: "/manifest.json",
+  manifest: isGitHubPages ? "/world-clock/manifest.json" : "/manifest.json",
+  ...(isGitHubPages
+    ? {
+        icons: {
+          icon: [{ url: "/world-clock/icon", type: "image/png", sizes: "64x64" }],
+          apple: [{ url: "/world-clock/apple-icon", type: "image/png", sizes: "180x180" }],
+        },
+      }
+    : {}),
   alternates: { canonical: "/" },
   robots: {
     index: true,
