@@ -1,11 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createHash } from "node:crypto";
+import { gotoApp, stubOpenMeteo } from "./helpers";
 
 test.describe("Globe performance", () => {
   test("clicking a card does not cause globe re-initialization", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await stubOpenMeteo(page);
+    await gotoApp(page, "domcontentloaded");
     await page.waitForTimeout(3000);
 
     // Start collecting logs AFTER init is done
@@ -68,7 +70,8 @@ test.describe("Globe performance", () => {
     // software rasteriser.
     test.slow();
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await stubOpenMeteo(page);
+    await gotoApp(page, "domcontentloaded");
     await page.waitForTimeout(3000);
 
     const movingBefore = await distinctFrames(page);
@@ -91,7 +94,8 @@ test.describe("Globe performance", () => {
 
   test("no excessive re-renders on timer tick", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await stubOpenMeteo(page);
+    await gotoApp(page, "domcontentloaded");
     await page.waitForTimeout(3000);
 
     const logs: string[] = [];

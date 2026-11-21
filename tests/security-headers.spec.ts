@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { OPEN_METEO, gotoApp, stubOpenMeteo } from "./helpers";
 
 test("security headers present and no CSP violations at runtime", async ({ page }) => {
   const violations: string[] = [];
@@ -8,7 +9,12 @@ test("security headers present and no CSP violations at runtime", async ({ page 
   });
   page.on("pageerror", (e) => violations.push("pageerror: " + e.message));
 
-  const res = await page.goto("/", { waitUntil: "networkidle" });
+  await stubOpenMeteo(page);
+  // Stub fulfills the response, but the browser still issues the request.
+  // Waiting for it proves connect-src allowed api.open-meteo.com.
+  const weatherRequest = page.waitForRequest(OPEN_METEO);
+
+  const res = await page.goto("/", { waitUntil: "load" });
   expect(res).not.toBeNull();
 
   const h = res!.headers();
@@ -24,8 +30,10 @@ test("security headers present and no CSP violations at runtime", async ({ page 
 
   // App actually rendered under the policy.
   await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.locator(".region-card").first()).toBeVisible();
   expect(await page.locator(".region-card").count()).toBeGreaterThan(0);
 
+  await weatherRequest;
   console.log("violations:", violations);
   expect(violations).toEqual([]);
 });
@@ -48,9 +56,10 @@ test("header action buttons do not steal each other's clicks", async ({ page }) 
   ];
 
   // The icon row is `hidden xl:flex`; below that the fixed bottom nav takes over.
+  await stubOpenMeteo(page);
   for (const width of [1280, 1440, 1600, 1920]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+    await gotoApp(page);
 
     const problems: string[] = [];
     let checked = 0;
@@ -95,9 +104,10 @@ test("header action buttons do not steal each other's clicks", async ({ page }) 
 // fit it without pushing buttons past the right edge of a viewport that has no
 // horizontal scrollbar. The fixed bottom nav must therefore be reachable there.
 test("primary actions stay reachable below the xl breakpoint", async ({ page }) => {
+  await stubOpenMeteo(page);
   for (const width of [640, 768, 900, 1024, 1152, 1279]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+    await gotoApp(page);
 
     const nav = page.locator('nav[aria-label="Primary actions"]');
     await expect(nav, `bottom nav missing at ${width}px`).toBeVisible();
@@ -130,7 +140,8 @@ test("primary actions stay reachable below the xl breakpoint", async ({ page }) 
 // alias table is written against modern canonical names. Without the mapping
 // between them these very common queries silently return nothing.
 test("alias search resolves legacy-id timezones", async ({ page }) => {
-  await page.goto("/");
+  await stubOpenMeteo(page);
+  await gotoApp(page);
 
   const input = page.locator('input[role="combobox"]');
 
