@@ -7,6 +7,10 @@ import { version } from "./package.json";
 // hydration scripts, and there is no middleware here to inject a nonce (adding
 // one would make browsers ignore 'unsafe-inline' and break the app).
 const isDev = process.env.NODE_ENV === "development";
+// GitHub Pages is a static host. GITHUB_PAGES=true switches to `output:
+// "export"` with a `/world-clock` prefix. Docker and `next start` leave this
+// unset so they keep the standalone Node server and security headers.
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
 
 const CSP = [
   "default-src 'self'",
@@ -25,7 +29,7 @@ const CSP = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: isGitHubPages ? "export" : "standalone",
   // Surfaced in the About dialog. Injected here rather than importing
   // package.json from a client component, which would pull the whole manifest
   // (including devDependency names) into the browser bundle.
@@ -37,22 +41,33 @@ const nextConfig: NextConfig = {
   },
   compress: true,
   productionBrowserSourceMaps: false,
-  headers: async () => [
-    {
-      source: "/(.*)",
-      headers: [
-        { key: "X-Content-Type-Options", value: "nosniff" },
-        { key: "X-Frame-Options", value: "DENY" },
-        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-        { key: "Content-Security-Policy", value: CSP },
-        {
-          key: "Strict-Transport-Security",
-          value: "max-age=63072000; includeSubDomains; preload",
-        },
-      ],
-    },
-  ],
+  ...(isGitHubPages
+    ? {
+        basePath: "/world-clock",
+        assetPrefix: "/world-clock",
+        trailingSlash: true,
+        // Default next/image optimization needs a server. Unused today, but
+        // required so a future <Image> does not break the static export.
+        images: { unoptimized: true },
+      }
+    : {
+        headers: async () => [
+          {
+            source: "/(.*)",
+            headers: [
+              { key: "X-Content-Type-Options", value: "nosniff" },
+              { key: "X-Frame-Options", value: "DENY" },
+              { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+              { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+              { key: "Content-Security-Policy", value: CSP },
+              {
+                key: "Strict-Transport-Security",
+                value: "max-age=63072000; includeSubDomains; preload",
+              },
+            ],
+          },
+        ],
+      }),
 };
 
 export default nextConfig;
