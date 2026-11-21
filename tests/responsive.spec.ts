@@ -1,4 +1,5 @@
 import { test } from "@playwright/test";
+import { gotoApp, stubOpenMeteo } from "./helpers";
 
 const viewports = [
   { name: "mobile-sm", width: 375, height: 812 },
@@ -13,7 +14,8 @@ for (const vp of viewports) {
     page,
   }) => {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await stubOpenMeteo(page);
+    await gotoApp(page, "domcontentloaded");
     await page.waitForTimeout(5000);
     await page.screenshot({
       path: `screenshots/${vp.name}.png`,

@@ -8,6 +8,8 @@ const baseURL = `http://localhost:${port}`;
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
+  // Safety net only. Specs wait on real UI signals, not networkidle.
+  retries: process.env.CI ? 1 : 0,
   // The HTML report is what CI uploads as an artifact; it is not produced by
   // the default reporter, so ask for it explicitly.
   reporter: process.env.CI

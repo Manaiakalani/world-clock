@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoApp, stubOpenMeteo } from "./helpers";
 
 const viewports = [
   { name: "mobile-sm", width: 375, height: 812 },
@@ -9,8 +10,9 @@ const viewports = [
 ];
 
 async function setupPage(page: Page, vp: (typeof viewports)[0]) {
+  await stubOpenMeteo(page);
   await page.setViewportSize({ width: vp.width, height: vp.height });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoApp(page, "domcontentloaded");
   await page.waitForTimeout(3000);
 }
 
@@ -445,8 +447,9 @@ test.describe("Fit & finish audit", () => {
   test("Screenshot — both themes", async ({ page }) => {
     test.setTimeout(120_000);
     for (const vp of viewports) {
+      await stubOpenMeteo(page);
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await gotoApp(page, "domcontentloaded");
       await page.waitForTimeout(2000);
 
       // Determine current theme
