@@ -7,9 +7,10 @@ import "./globals.css";
 
 // File-convention icons and public/manifest.json are not prefixed by Next
 // when using Turbopack + `output: "export"`. Spell the GitHub Pages subpath
-// here so the demo does not request `/icon` and `/manifest.json` from the
-// github.io root.
-const appBasePath = process.env.GITHUB_PAGES === "true" ? "/world-clock" : "";
+// on that build only, so the demo does not request `/icon` and
+// `/manifest.json` from the github.io root. The standalone build keeps
+// Next's own hashed file-convention icon URLs.
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -49,11 +50,15 @@ export const metadata: Metadata = {
   creator: siteConfig.author,
   publisher: siteConfig.author,
   category: "productivity",
-  manifest: `${appBasePath}/manifest.json`,
-  icons: {
-    icon: [{ url: `${appBasePath}/icon`, type: "image/png", sizes: "64x64" }],
-    apple: [{ url: `${appBasePath}/apple-icon`, type: "image/png", sizes: "180x180" }],
-  },
+  manifest: isGitHubPages ? "/world-clock/manifest.json" : "/manifest.json",
+  ...(isGitHubPages
+    ? {
+        icons: {
+          icon: [{ url: "/world-clock/icon", type: "image/png", sizes: "64x64" }],
+          apple: [{ url: "/world-clock/apple-icon", type: "image/png", sizes: "180x180" }],
+        },
+      }
+    : {}),
   alternates: { canonical: "/" },
   robots: {
     index: true,
